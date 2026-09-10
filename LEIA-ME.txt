@@ -1,0 +1,4 @@
+Baixe o arquivo supabase.js (build UMD) em:
+https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js
+
+Salve nesta mesma pasta como "supabase.js", substituindo este arquivo.

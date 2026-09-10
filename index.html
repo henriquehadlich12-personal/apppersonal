@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Agenda do Personal</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header class="topbar">
+    <div class="brand">Agenda</div>
+    <nav class="tabs">
+      <button class="tab-btn is-active" data-view="agenda">Hoje</button>
+      <button class="tab-btn" data-view="alunos">Alunos</button>
+    </nav>
+  </header>
+
+  <!-- ==================== VIEW: AGENDA ==================== -->
+  <main id="view-agenda" class="view">
+
+    <div class="date-nav">
+      <button id="btn-prev-day" class="icon-btn" aria-label="Dia anterior">&#8592;</button>
+      <div class="date-display">
+        <div id="date-weekday" class="date-weekday">Quinta-feira</div>
+        <div id="date-full" class="date-full">10 de setembro</div>
+      </div>
+      <button id="btn-next-day" class="icon-btn" aria-label="Próximo dia">&#8594;</button>
+    </div>
+    <button id="btn-today" class="link-btn">Voltar para hoje</button>
+
+    <div class="legend">
+      <span class="legend-item"><i class="dot dot-vago"></i>Vago</span>
+      <span class="legend-item"><i class="dot dot-personal"></i>Personal</span>
+      <span class="legend-item"><i class="dot dot-avaliacao"></i>Avaliação</span>
+      <span class="legend-item"><i class="dot dot-bloqueio"></i>Bloqueio</span>
+    </div>
+
+    <div id="agenda-list" class="agenda-list">
+      <!-- linhas de horário geradas via JS -->
+    </div>
+
+  </main>
+
+  <!-- ==================== VIEW: ALUNOS ==================== -->
+  <main id="view-alunos" class="view is-hidden">
+    <div class="section-header">
+      <h1>Alunos</h1>
+      <button id="btn-novo-aluno" class="primary-btn">+ Novo aluno</button>
+    </div>
+    <div id="alunos-list" class="alunos-list">
+      <!-- lista de alunos gerada via JS -->
+    </div>
+  </main>
+
+  <!-- ==================== SHEET: HORÁRIO (criar/editar) ==================== -->
+  <div id="sheet-horario" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="sheet-horario-titulo">Novo horário</h2>
+
+      <div id="sheet-horario-detalhe" class="is-hidden">
+        <p id="detalhe-info" class="detalhe-info"></p>
+        <a id="btn-contatar" class="whatsapp-btn is-hidden" target="_blank" rel="noopener">
+          Contatar aluno
+        </a>
+        <div id="detalhe-excluir-container" class="sheet-actions"></div>
+        <div class="sheet-actions">
+          <button id="btn-fechar-detalhe" class="secondary-btn">Fechar</button>
+        </div>
+      </div>
+
+      <form id="form-horario">
+        <label class="field-label">Tipo de horário</label>
+        <div class="tipo-toggle">
+          <button type="button" class="tipo-opt is-active" data-tipo="personal">Personal</button>
+          <button type="button" class="tipo-opt" data-tipo="avaliacao">Avaliação</button>
+          <button type="button" class="tipo-opt" data-tipo="bloqueio">Bloqueio</button>
+        </div>
+
+        <div id="campo-aluno" class="field">
+          <label class="field-label" for="select-aluno">Aluno</label>
+          <select id="select-aluno" class="field-input"></select>
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="input-inicio">Início</label>
+            <input type="time" id="input-inicio" class="field-input" required />
+          </div>
+          <div class="field">
+            <label class="field-label" for="input-fim">Fim</label>
+            <input type="time" id="input-fim" class="field-input" required />
+          </div>
+        </div>
+
+        <div class="field">
+          <label class="field-label" for="input-obs">Observações (opcional)</label>
+          <input type="text" id="input-obs" class="field-input" placeholder="Ex: trocar exercício de perna" />
+        </div>
+
+        <div id="campo-serie" class="field field-serie">
+          <label class="checkbox-label">
+            <input type="checkbox" id="check-serie" />
+            Repetir semanalmente (horário fixo)
+          </label>
+          <div id="campo-serie-semanas" class="field is-hidden">
+            <label class="field-label" for="input-semanas">Repetir por quantas semanas?</label>
+            <input type="number" id="input-semanas" class="field-input" min="1" max="52" value="8" />
+          </div>
+        </div>
+
+        <div class="sheet-actions">
+          <button type="submit" class="primary-btn">Salvar</button>
+          <button type="button" id="btn-cancelar-horario" class="secondary-btn">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ==================== SHEET: ALUNO (criar/editar) ==================== -->
+  <div id="sheet-aluno" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="sheet-aluno-titulo">Novo aluno</h2>
+      <form id="form-aluno">
+        <div class="field">
+          <label class="field-label" for="input-aluno-nome">Nome</label>
+          <input type="text" id="input-aluno-nome" class="field-input" required />
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-aluno-telefone">Telefone (com DDD)</label>
+          <input type="tel" id="input-aluno-telefone" class="field-input" placeholder="51999999999" required />
+        </div>
+        <div class="sheet-actions">
+          <button type="submit" class="primary-btn">Salvar</button>
+          <button type="button" id="btn-cancelar-aluno" class="secondary-btn">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast is-hidden"></div>
+
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
