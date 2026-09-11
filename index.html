@@ -10,10 +10,6 @@
 
   <header class="topbar">
     <div class="brand">Agenda</div>
-    <nav class="tabs">
-      <button class="tab-btn is-active" data-view="agenda">Hoje</button>
-      <button class="tab-btn" data-view="alunos">Alunos</button>
-    </nav>
   </header>
 
   <!-- ==================== VIEW: AGENDA ==================== -->
@@ -46,12 +42,27 @@
   <main id="view-alunos" class="view is-hidden">
     <div class="section-header">
       <h1>Alunos</h1>
-      <button id="btn-novo-aluno" class="primary-btn">+ Novo aluno</button>
     </div>
     <div id="alunos-list" class="alunos-list">
       <!-- lista de alunos gerada via JS -->
     </div>
   </main>
+
+  <button id="btn-novo-aluno" class="fab is-hidden" aria-label="Novo aluno">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+  </button>
+
+  <!-- ==================== BARRA INFERIOR ==================== -->
+  <nav class="bottom-bar">
+    <button class="bottom-tab is-active" data-view="agenda">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><path d="M3 10h18M8 2v4M16 2v4"/></svg>
+      <span>Hoje</span>
+    </button>
+    <button class="bottom-tab" data-view="alunos">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>
+      <span>Alunos</span>
+    </button>
+  </nav>
 
   <!-- ==================== SHEET: HORÁRIO (criar/editar) ==================== -->
   <div id="sheet-horario" class="sheet-overlay is-hidden">

@@ -35,6 +35,17 @@ function horaCurta(t) {
   return t ? t.slice(0, 5) : "";
 }
 
+function timeToMin(t) {
+  const [h, m] = t.split(":").map(Number);
+  return h * 60 + m;
+}
+
+const ICONS = {
+  personal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M2 9.5h3M2 14.5h3M19 9.5h3M19 14.5h3M6.5 12h11"/></svg>',
+  avaliacao: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2.5 2.5L16 8"/><rect x="4" y="4" width="16" height="17" rx="2.5"/></svg>',
+  bloqueio: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
+};
+
 function toast(msg) {
   const el = document.getElementById("toast");
   el.textContent = msg;
@@ -55,13 +66,14 @@ const MONTHS = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "jul
 // Navegação entre views (Agenda / Alunos)
 // ------------------------------------------------------------
 
-document.querySelectorAll(".tab-btn").forEach((btn) => {
+document.querySelectorAll(".bottom-tab").forEach((btn) => {
   btn.addEventListener("click", () => {
-    document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("is-active"));
+    document.querySelectorAll(".bottom-tab").forEach((b) => b.classList.remove("is-active"));
     btn.classList.add("is-active");
     const view = btn.dataset.view;
     document.getElementById("view-agenda").classList.toggle("is-hidden", view !== "agenda");
     document.getElementById("view-alunos").classList.toggle("is-hidden", view !== "alunos");
+    document.getElementById("btn-novo-aluno").classList.toggle("is-hidden", view !== "alunos");
     if (view === "alunos") carregarAlunos();
   });
 });
@@ -114,14 +126,26 @@ function renderAgendaList() {
 
   for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
     const horaStr = String(hour).padStart(2, "0") + ":00";
-    const agendamento = agendamentosDoDia.find((a) => horaCurta(a.hora_inicio) === horaStr);
+    const slotStart = hour * 60;
+    const slotEnd = slotStart + 60;
+
+    // Um agendamento "ocupa" esta linha se o intervalo dele cruza
+    // com o intervalo da hora, não só se começa exatamente aqui.
+    // Isso é o que faz um bloqueio de 13h às 17h preencher as 4 linhas.
+    const agendamento = agendamentosDoDia.find((a) => {
+      const ini = timeToMin(a.hora_inicio);
+      const fim = timeToMin(a.hora_fim);
+      return ini < slotEnd && fim > slotStart;
+    });
+
+    const ehContinuacao = agendamento && timeToMin(agendamento.hora_inicio) < slotStart;
 
     const row = document.createElement("div");
-    row.className = "slot-row " + (agendamento ? agendamento.tipo : "vago");
+    row.className = "slot-row " + (agendamento ? agendamento.tipo : "vago") + (ehContinuacao ? " is-continuacao" : "");
 
     const horaEl = document.createElement("div");
     horaEl.className = "slot-hora";
-    horaEl.textContent = horaStr;
+    horaEl.textContent = ehContinuacao ? "" : horaStr;
     row.appendChild(horaEl);
 
     const info = document.createElement("div");
@@ -130,6 +154,9 @@ function renderAgendaList() {
     if (!agendamento) {
       info.innerHTML = `<div class="slot-titulo">Vago</div>`;
       row.addEventListener("click", () => abrirSheetNovo(horaStr));
+    } else if (ehContinuacao) {
+      info.innerHTML = `<div class="slot-continua"></div>`;
+      row.addEventListener("click", () => abrirSheetDetalhe(agendamento));
     } else if (agendamento.tipo === "bloqueio") {
       info.innerHTML = `
         <div class="slot-titulo">${agendamento.observacoes || "Bloqueio"}</div>
@@ -144,10 +171,10 @@ function renderAgendaList() {
     }
     row.appendChild(info);
 
-    if (agendamento && agendamento.tipo !== "vago") {
+    if (agendamento && agendamento.tipo !== "vago" && !ehContinuacao) {
       const badge = document.createElement("span");
       badge.className = "slot-badge";
-      badge.textContent = agendamento.tipo === "personal" ? "Personal" : agendamento.tipo === "avaliacao" ? "Avaliação" : "Bloqueio";
+      badge.innerHTML = `${ICONS[agendamento.tipo]}<span>${agendamento.tipo === "personal" ? "Personal" : agendamento.tipo === "avaliacao" ? "Avaliação" : "Bloqueio"}</span>`;
       row.appendChild(badge);
     }
 
@@ -381,14 +408,20 @@ function renderAlunosList() {
   alunosCache.forEach((aluno) => {
     const row = document.createElement("div");
     row.className = "aluno-row";
+    const inicial = aluno.nome.trim().charAt(0).toUpperCase();
     row.innerHTML = `
-      <div>
+      <div class="aluno-avatar">${inicial}</div>
+      <div class="aluno-info">
         <div class="aluno-nome">${aluno.nome}</div>
         <div class="aluno-telefone">${aluno.telefone}</div>
       </div>
       <div class="aluno-actions">
-        <button data-action="editar" aria-label="Editar">&#9998;</button>
-        <button data-action="excluir" aria-label="Excluir">&#10005;</button>
+        <button data-action="editar" aria-label="Editar" class="icon-action">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
+        <button data-action="excluir" aria-label="Excluir" class="icon-action icon-action-danger">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
       </div>`;
     row.querySelector('[data-action="editar"]').addEventListener("click", () => abrirSheetAluno(aluno));
     row.querySelector('[data-action="excluir"]').addEventListener("click", () => excluirAluno(aluno));
