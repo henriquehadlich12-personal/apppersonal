@@ -73,8 +73,10 @@ document.querySelectorAll(".bottom-tab").forEach((btn) => {
     const view = btn.dataset.view;
     document.getElementById("view-agenda").classList.toggle("is-hidden", view !== "agenda");
     document.getElementById("view-alunos").classList.toggle("is-hidden", view !== "alunos");
+    document.getElementById("view-treinos").classList.toggle("is-hidden", view !== "treinos");
     document.getElementById("btn-novo-aluno").classList.toggle("is-hidden", view !== "alunos");
     if (view === "alunos") carregarAlunos();
+    if (view === "treinos" && typeof inicializarTreinos === "function") inicializarTreinos();
   });
 });
 
@@ -438,6 +440,9 @@ function abrirSheetAluno(aluno) {
   if (aluno) {
     document.getElementById("input-aluno-nome").value = aluno.nome;
     document.getElementById("input-aluno-telefone").value = aluno.telefone;
+    document.getElementById("input-aluno-nascimento").value = aluno.data_nascimento || "";
+    document.getElementById("input-aluno-peso").value = aluno.peso_kg || "";
+    document.getElementById("input-aluno-altura").value = aluno.altura_cm || "";
   }
   sheetAluno.classList.remove("is-hidden");
 }
@@ -450,12 +455,23 @@ formAluno.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nome = document.getElementById("input-aluno-nome").value.trim();
   const telefone = document.getElementById("input-aluno-telefone").value.trim();
+  const dataNascimento = document.getElementById("input-aluno-nascimento").value || null;
+  const peso = document.getElementById("input-aluno-peso").value || null;
+  const altura = document.getElementById("input-aluno-altura").value || null;
+
+  const payload = {
+    nome,
+    telefone,
+    data_nascimento: dataNascimento,
+    peso_kg: peso,
+    altura_cm: altura,
+  };
 
   let error;
   if (editandoAlunoId) {
-    ({ error } = await sb.from("alunos").update({ nome, telefone }).eq("id", editandoAlunoId));
+    ({ error } = await sb.from("alunos").update(payload).eq("id", editandoAlunoId));
   } else {
-    ({ error } = await sb.from("alunos").insert([{ nome, telefone }]));
+    ({ error } = await sb.from("alunos").insert([payload]));
   }
 
   if (error) {

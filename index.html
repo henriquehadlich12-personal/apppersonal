@@ -48,6 +48,77 @@
     </div>
   </main>
 
+  <!-- ==================== VIEW: TREINOS ==================== -->
+  <main id="view-treinos" class="view is-hidden">
+    <div class="section-header">
+      <h1>Treinos</h1>
+    </div>
+
+    <div class="field">
+      <label class="field-label" for="select-aluno-treino">Aluno</label>
+      <select id="select-aluno-treino" class="field-input"></select>
+    </div>
+
+    <div id="treino-aluno-vazio" class="empty-hint">
+      Selecione um aluno para montar o treino.
+    </div>
+
+    <div id="treino-conteudo" class="is-hidden">
+
+      <div id="aluno-header-card" class="aluno-header-card"></div>
+
+      <h3 class="subsection-title">Adicionar equipamento</h3>
+      <div id="equip-categorias" class="chip-row"></div>
+      <div id="equip-grid" class="equip-grid"></div>
+
+      <h3 class="subsection-title">Treino em montagem</h3>
+      <div id="treino-draft-list" class="draft-list"></div>
+      <div id="treino-draft-vazio" class="empty-hint">Nenhum equipamento adicionado ainda.</div>
+
+      <div class="field">
+        <label class="field-label" for="input-treino-titulo">Nome do treino (opcional)</label>
+        <input type="text" id="input-treino-titulo" class="field-input" placeholder="Ex: Treino A - Superiores" />
+      </div>
+
+      <button id="btn-salvar-treino" class="primary-btn full-width">Salvar treino</button>
+
+      <h3 class="subsection-title">Treinos anteriores</h3>
+      <div id="treinos-historico" class="historico-list"></div>
+    </div>
+  </main>
+
+  <!-- ==================== SHEET: ITEM DO TREINO ==================== -->
+  <div id="sheet-item-treino" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="sheet-item-titulo">Adicionar exercício</h2>
+      <form id="form-item-treino">
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="input-item-series">Séries</label>
+            <input type="number" id="input-item-series" class="field-input" min="1" value="3" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="input-item-reps">Repetições</label>
+            <input type="text" id="input-item-reps" class="field-input" placeholder="12-15" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-item-carga">Carga</label>
+          <input type="text" id="input-item-carga" class="field-input" placeholder="20kg, peso do corpo..." />
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-item-obs">Observações</label>
+          <input type="text" id="input-item-obs" class="field-input" placeholder="Ex: cadência lenta na descida" />
+        </div>
+        <div class="sheet-actions">
+          <button type="submit" class="primary-btn">Adicionar ao treino</button>
+          <button type="button" id="btn-cancelar-item" class="secondary-btn">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <button id="btn-novo-aluno" class="fab is-hidden" aria-label="Novo aluno">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
   </button>
@@ -61,6 +132,10 @@
     <button class="bottom-tab" data-view="alunos">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6.5 6.5-6.5s6.5 2.9 6.5 6.5"/><circle cx="17.5" cy="9" r="2.5"/><path d="M15.5 13.2c2.6.4 4.5 2.6 4.5 5.3"/></svg>
       <span>Alunos</span>
+    </button>
+    <button class="bottom-tab" data-view="treinos">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5v11M17.5 6.5v11M2 9.5h3M2 14.5h3M19 9.5h3M19 14.5h3M6.5 12h11"/></svg>
+      <span>Treinos</span>
     </button>
   </nav>
 
@@ -143,6 +218,20 @@
           <label class="field-label" for="input-aluno-telefone">Telefone (com DDD)</label>
           <input type="tel" id="input-aluno-telefone" class="field-input" placeholder="51999999999" required />
         </div>
+        <div class="field-row">
+          <div class="field">
+            <label class="field-label" for="input-aluno-nascimento">Data de nascimento</label>
+            <input type="date" id="input-aluno-nascimento" class="field-input" />
+          </div>
+          <div class="field">
+            <label class="field-label" for="input-aluno-peso">Peso (kg)</label>
+            <input type="number" step="0.1" id="input-aluno-peso" class="field-input" placeholder="72.5" />
+          </div>
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-aluno-altura">Altura (cm)</label>
+          <input type="number" step="0.5" id="input-aluno-altura" class="field-input" placeholder="175" />
+        </div>
         <div class="sheet-actions">
           <button type="submit" class="primary-btn">Salvar</button>
           <button type="button" id="btn-cancelar-aluno" class="secondary-btn">Cancelar</button>
@@ -154,7 +243,10 @@
   <div id="toast" class="toast is-hidden"></div>
 
   <script src="vendor/supabase.js"></script>
+  <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
+  <script src="equipamentos.js"></script>
   <script src="app.js"></script>
+  <script src="treinos.js"></script>
 </body>
 </html>

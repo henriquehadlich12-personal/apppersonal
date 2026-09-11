@@ -3,14 +3,23 @@
 App estático (HTML/CSS/JS puro) + Supabase, sem build step. Pronto para
 subir num repositório do GitHub.
 
-## 1. Baixar o supabase-js localmente
+## 1. Baixar as bibliotecas localmente
 
-Como CDN pode ser bloqueado em rede corporativa, o app carrega o
-supabase-js de um arquivo local em vez de um link externo.
+Como CDN pode ser bloqueado em rede corporativa, o app carrega essas
+bibliotecas de arquivos locais em vez de links externos.
 
+**Supabase:**
 1. Acesse: https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js
-2. Salve o conteúdo como `vendor/supabase.js` dentro deste projeto
-   (substituindo o placeholder, se houver).
+2. Salve o conteúdo como `vendor/supabase.js`.
+
+**jsPDF** (usado para gerar o PDF do treino):
+1. Acesse: https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js
+2. Salve o conteúdo como `vendor/jspdf.umd.min.js`.
+
+Em ambos os casos: clique com o botão direito na página que abrir e
+escolha "Salvar como...", ajustando o tipo do arquivo para "Todos os
+arquivos" antes de salvar (assim evita que o navegador embrulhe o
+conteúdo em HTML).
 
 ## 2. Configurar as credenciais
 
@@ -44,25 +53,50 @@ E acesse `http://localhost:8000`.
 
 ## Estrutura de dados
 
-- **alunos**: nome + telefone, usado para preencher o seletor de aluno
-  sem precisar digitar.
+- **alunos**: nome, telefone, data de nascimento, peso e altura —
+  usado tanto para marcar horários quanto para montar treinos.
 - **agendamentos**: cada linha é um horário do dia. `tipo` pode ser
   `personal`, `avaliacao` ou `bloqueio`. Horários fixos criados em
   série compartilham um `serie_id`, o que permite excluir todos os
   futuros de uma vez.
+- **treinos**: uma ficha de treino montada para um aluno, com título
+  opcional e (futuramente) o link do PDF no Google Drive.
+- **treino_itens**: cada equipamento dentro de um treino, com séries,
+  repetições, carga e observações. O catálogo de equipamentos (nomes
+  e croquis) fica no arquivo `equipamentos.js`, não no banco.
 
-## O que já funciona nesta primeira versão
+## O que já funciona nesta versão
 
-- Mapa do dia em blocos de 1 hora (06h–21h), colorido por tipo.
-- Criar horário avulso (personal, avaliação ou bloqueio).
-- Criar personal em série (repete semanalmente por N semanas).
+- Mapa do dia em blocos de 1 hora (06h–21h), colorido por tipo —
+  inclusive horários que ocupam várias horas seguidas (ex: um
+  bloqueio das 13h às 17h preenche as 4 linhas corretamente.
+- Criar horário avulso (personal, avaliação ou bloqueio) e personal
+  em série (repete semanalmente por N semanas).
 - Excluir um horário específico ou a série inteira a partir da data atual.
 - Botão "Contatar aluno" abrindo o WhatsApp (wa.me) direto do horário.
-- Cadastro de alunos (criar, editar, excluir com proteção contra
-  exclusão de aluno com horários pendentes).
+- Cadastro de alunos com dados físicos (nascimento, peso, altura),
+  edição e exclusão (bloqueada se o aluno tiver horários pendentes).
+- Aba **Treinos**: seleciona o aluno, mostra idade/peso/altura no
+  topo, monta o treino escolhendo equipamentos de um catálogo com
+  croquis, define séries/repetições/carga/observações por item, e
+  salva a ficha. Histórico de treinos por aluno.
+- Geração de **PDF** da ficha de treino, com o nome do personal
+  (Henrique Mateus Hadlich), dados do aluno e a lista de exercícios —
+  baixa direto no dispositivo.
 
-## Ideias para próximos passos
+## Próximo passo: Google Drive + envio automático por WhatsApp
+
+Hoje o botão "Gerar PDF" baixa o arquivo no computador/celular do
+personal, e o botão "WhatsApp" no histórico de treinos fica
+desabilitado até existir um link do Drive salvo (`treinos.pdf_url`).
+
+Para fechar esse fluxo (subir o PDF automaticamente pro Google Drive
+do personal e liberar o botão de WhatsApp com o link pronto), será
+necessário configurar um acesso no Google Cloud Console (parecido com
+o que fizemos no Supabase) — isso fica para uma próxima etapa.
+
+## Outras ideias para o futuro
 
 - Editar um horário existente (hoje só dá para excluir e recriar).
 - Slots com granularidade menor que 1 hora, se necessário.
-- Indicador visual na aba "Hoje" quando não é o dia atual.
+- Reordenar os exercícios dentro do treino antes de salvar.
