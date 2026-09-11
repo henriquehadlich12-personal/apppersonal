@@ -86,14 +86,44 @@ E acesse `http://localhost:8000`.
 
 ## Próximo passo: Google Drive + envio automático por WhatsApp
 
-Hoje o botão "Gerar PDF" baixa o arquivo no computador/celular do
-personal, e o botão "WhatsApp" no histórico de treinos fica
-desabilitado até existir um link do Drive salvo (`treinos.pdf_url`).
+**Status: implementado.** Ao clicar em "Gerar PDF", o app agora:
+1. Monta o PDF (com o croqui de cada equipamento embutido).
+2. Baixa o arquivo no dispositivo do personal.
+3. Sobe automaticamente para o Google Drive do personal (pasta raiz).
+4. Libera o link para "qualquer pessoa com o link pode visualizar"
+   (necessário para o aluno abrir pelo WhatsApp sem precisar de conta
+   Google com permissão).
+5. Salva esse link em `treinos.pdf_url` e libera o botão de WhatsApp.
 
-Para fechar esse fluxo (subir o PDF automaticamente pro Google Drive
-do personal e liberar o botão de WhatsApp com o link pronto), será
-necessário configurar um acesso no Google Cloud Console (parecido com
-o que fizemos no Supabase) — isso fica para uma próxima etapa.
+**Uma exceção à regra de "nada de CDN"**: o script de login do Google
+(`accounts.google.com/gsi/client`) precisa ser carregado direto do
+domínio do Google — não dá pra baixar e hospedar local, porque ele
+está ligado à sessão de login ativa do navegador. Esse é o único
+script do projeto carregado assim; todo o resto continua local.
+
+### Configuração necessária no Google Cloud
+
+1. Acesse https://console.cloud.google.com e crie (ou reaproveite) um projeto.
+2. Em "APIs e Serviços > Biblioteca", ative a **Google Drive API**.
+3. Em "APIs e Serviços > Tela de consentimento OAuth", configure como
+   "Externo", adicione seu e-mail como usuário de teste (não precisa
+   publicar o app, já que é uso pessoal).
+4. Em "APIs e Serviços > Credenciais", crie uma credencial do tipo
+   **OAuth Client ID**, tipo de aplicativo **Web application**.
+5. Em "Authorized JavaScript origins", adicione exatamente a URL do
+   seu site publicado no GitHub Pages (ex:
+   `https://seu-usuario.github.io`, sem barra no final).
+6. Copie o Client ID gerado (termina em `.apps.googleusercontent.com`)
+   e cole em `config.js`, na constante `GOOGLE_CLIENT_ID`.
+
+Na primeira vez que clicar em "Gerar PDF", o navegador vai abrir uma
+tela de login/consentimento do Google — é normal, é o personal
+autorizando o app a criar arquivos no próprio Drive dele.
+
+**Sobre privacidade**: o link gerado fica acessível a qualquer pessoa
+que o receba (não é indexado, mas não exige login). Isso é necessário
+para o aluno conseguir abrir o PDF pelo WhatsApp sem ter conta
+autorizada no Drive do personal.
 
 ## Outras ideias para o futuro
 

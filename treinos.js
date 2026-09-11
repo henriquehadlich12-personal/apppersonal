@@ -291,15 +291,74 @@ function renderHistoricoTreinos(treinos) {
 }
 
 // ------------------------------------------------------------
-// Geração do PDF (client-side, com jsPDF)
+// Ícone do equipamento como imagem (usado dentro do PDF)
 // ------------------------------------------------------------
 
-function gerarPdfTreino(treino) {
+function desenharFundoArredondado(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
+}
+
+function svgParaPng(svgString, tamanho) {
+  return new Promise((resolve, reject) => {
+    const svgComNamespace = svgString.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
+    const svg64 = btoa(unescape(encodeURIComponent(svgComNamespace)));
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = tamanho;
+      canvas.height = tamanho;
+      const ctx = canvas.getContext("2d");
+      // selo colorido atrás do croqui — deixa o ícone com cara de
+      // "acabado" em vez de rascunho solto no papel
+      desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.18);
+      ctx.fillStyle = "#EEF2FF";
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = "#5B8CFF";
+      ctx.stroke();
+      const pad = tamanho * 0.18;
+      ctx.drawImage(img, pad, pad, tamanho - pad * 2, tamanho - pad * 2);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = "data:image/svg+xml;base64," + svg64;
+  });
+}
+
+async function precarregarIconesPdf(itens) {
+  const idsUnicos = [...new Set(itens.map((i) => i.equipamento_id))];
+  const pares = await Promise.all(
+    idsUnicos.map(async (id) => {
+      const equip = equipamentoPorId(id);
+      if (!equip) return [id, null];
+      const png = await svgParaPng(equip.svg, 120);
+      return [id, png];
+    })
+  );
+  return Object.fromEntries(pares);
+}
+
+// ------------------------------------------------------------
+// Geração do PDF (client-side, com jsPDF) + upload ao Drive
+// ------------------------------------------------------------
+
+async function gerarPdfTreino(treino) {
   if (typeof window.jspdf === "undefined") {
     toast("Biblioteca de PDF não carregada — veja o README");
     return;
   }
   const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
+  const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
+
+  toast("Montando PDF...");
+  const iconesPng = await precarregarIconesPdf(itensOrdenados);
+
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
 
@@ -350,11 +409,11 @@ function gerarPdfTreino(treino) {
     y += 24;
   }
 
-  const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
+  const iconeTamanho = 40;
 
   itensOrdenados.forEach((item, index) => {
     const equip = equipamentoPorId(item.equipamento_id);
-    const alturaBloco = item.observacoes ? 62 : 46;
+    const alturaBloco = item.observacoes ? 62 : 50;
 
     if (y + alturaBloco > doc.internal.pageSize.getHeight() - 50) {
       doc.addPage();
@@ -365,18 +424,17 @@ function gerarPdfTreino(treino) {
     doc.setFillColor(255, 255, 255);
     doc.roundedRect(margem, y, larguraPagina - margem * 2, alturaBloco, 6, 6, "FD");
 
-    // círculo numerado
-    doc.setFillColor(91, 140, 255);
-    doc.circle(margem + 24, y + 23, 12, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(11);
-    doc.text(String(index + 1), margem + 24, y + 27, { align: "center" });
+    const png = iconesPng[item.equipamento_id];
+    if (png) {
+      doc.addImage(png, "PNG", margem + 8, y + (alturaBloco - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
+    }
+
+    const textoX = margem + iconeTamanho + 20;
 
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(equip ? equip.nome : "Equipamento", margem + 48, y + 20);
+    doc.text(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, textoX, y + 22);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
@@ -386,13 +444,13 @@ function gerarPdfTreino(treino) {
       item.repeticoes ? `${item.repeticoes} repetições` : null,
       item.carga ? `Carga: ${item.carga}` : null,
     ].filter(Boolean).join("   ·   ");
-    doc.text(detalhes, margem + 48, y + 36);
+    doc.text(detalhes, textoX, y + 38);
 
     if (item.observacoes) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9.5);
       doc.setTextColor(140, 140, 140);
-      doc.text(item.observacoes, margem + 48, y + 51);
+      doc.text(item.observacoes, textoX, y + 53);
     }
 
     y += alturaBloco + 10;
@@ -407,8 +465,21 @@ function gerarPdfTreino(treino) {
   const nomeArquivo = `treino-${aluno.nome.toLowerCase().replace(/\s+/g, "-")}-${isoDate(new Date())}.pdf`;
   doc.save(nomeArquivo);
 
-  // A próxima etapa (Google Drive) vai pegar este mesmo blob e subir
-  // automaticamente, preenchendo treino.pdf_url. Por enquanto, o
-  // personal baixa o PDF aqui e envia manualmente.
-  toast("PDF gerado — envio automático pelo Drive ainda será configurado");
+  if (typeof GOOGLE_CLIENT_ID === "undefined" || GOOGLE_CLIENT_ID.includes("COLE_AQUI")) {
+    toast("PDF baixado. Configure o Google Drive no config.js para envio automático.");
+    return;
+  }
+
+  toast("Enviando PDF para o Google Drive...");
+  try {
+    const blob = doc.output("blob");
+    const { link } = await uploadPdfParaDrive(blob, nomeArquivo);
+    const { error } = await sb.from("treinos").update({ pdf_url: link }).eq("id", treino.id);
+    if (error) throw error;
+    toast("PDF salvo no Drive!");
+    carregarHistoricoTreinos();
+  } catch (err) {
+    console.error(err);
+    toast("PDF baixado, mas o envio ao Drive falhou");
+  }
 }
