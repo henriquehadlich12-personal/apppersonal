@@ -80,7 +80,7 @@ function renderAlunoHeaderCard() {
     <div class="aluno-header-dados">
       ${idade !== null ? `<span>${idade} anos</span>` : ""}
       ${aluno.peso_kg ? `<span>${aluno.peso_kg} kg</span>` : ""}
-      ${aluno.altura_cm ? `<span>${aluno.altura_cm} cm</span>` : ""}
+      ${aluno.altura_m ? `<span>${aluno.altura_m} m</span>` : ""}
     </div>`;
 }
 
@@ -393,7 +393,7 @@ async function gerarPdfTreino(treino) {
   const infoPartes = [];
   if (idade !== null) infoPartes.push(`${idade} anos`);
   if (aluno.peso_kg) infoPartes.push(`${aluno.peso_kg} kg`);
-  if (aluno.altura_cm) infoPartes.push(`${aluno.altura_cm} cm`);
+  if (aluno.altura_m) infoPartes.push(`${aluno.altura_m} m`);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(11);
   doc.setTextColor(90, 90, 90);

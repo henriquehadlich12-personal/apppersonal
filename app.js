@@ -442,7 +442,7 @@ function abrirSheetAluno(aluno) {
     document.getElementById("input-aluno-telefone").value = aluno.telefone;
     document.getElementById("input-aluno-nascimento").value = aluno.data_nascimento || "";
     document.getElementById("input-aluno-peso").value = aluno.peso_kg || "";
-    document.getElementById("input-aluno-altura").value = aluno.altura_cm || "";
+    document.getElementById("input-aluno-altura").value = aluno.altura_m || "";
   }
   sheetAluno.classList.remove("is-hidden");
 }
@@ -464,7 +464,7 @@ formAluno.addEventListener("submit", async (e) => {
     telefone,
     data_nascimento: dataNascimento,
     peso_kg: peso,
-    altura_cm: altura,
+    altura_m: altura,
   };
 
   let error;
