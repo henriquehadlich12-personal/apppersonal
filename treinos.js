@@ -414,25 +414,35 @@ function svgComNamespaceEtamanho(svgString, largura, altura) {
   return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(comNamespace)));
 }
 
-// Ícone (croqui) sempre tem viewBox 48x48, então funciona direto
-// com carregarImagemQuadrada. Foto real usa a URL do Storage.
 async function iconeOuFotoParaPng(equip, tamanho) {
-  const fotoUrl = equip ? equipamentoFotosCache[equip.id] : null;
+  if (!equip) return null;
+  const fotoUrl = equipamentoFotosCache[equip.id];
   if (fotoUrl) {
     try {
       return await carregarImagemQuadrada(fotoUrl, tamanho, true);
     } catch (e) {
-      console.warn("Falha ao carregar foto do equipamento, usando croqui", e);
+      console.warn(`Falha ao carregar foto de "${equip.nome}" (${fotoUrl}) — usando croqui`, e);
     }
   }
-  if (!equip) return null;
-  return carregarImagemQuadrada(svgComNamespaceEtamanho(equip.svg, 48, 48), tamanho);
+  try {
+    return await carregarImagemQuadrada(svgComNamespaceEtamanho(equip.svg, 48, 48), tamanho);
+  } catch (e) {
+    console.warn(`Falha ao carregar croqui de "${equip.nome}"`, e);
+    return null;
+  }
 }
 
 async function precarregarIconesPdf(itens) {
   const idsUnicos = [...new Set(itens.map((i) => i.equipamento_id))];
   const pares = await Promise.all(
-    idsUnicos.map(async (id) => [id, await iconeOuFotoParaPng(equipamentoPorId(id), 140)])
+    idsUnicos.map(async (id) => {
+      try {
+        return [id, await iconeOuFotoParaPng(equipamentoPorId(id), 140)];
+      } catch (e) {
+        console.warn(`Falha total ao preparar imagem do equipamento ${id}`, e);
+        return [id, null];
+      }
+    })
   );
   return Object.fromEntries(pares);
 }
@@ -468,14 +478,14 @@ async function gerarPdfTreino(treino) {
   let iconesPng = {};
   let logoPng = null;
   try {
-    [iconesPng, logoPng] = await Promise.all([
-      precarregarIconesPdf(itensOrdenados),
-      logoMarcaParaPng(96),
-    ]);
+    iconesPng = await precarregarIconesPdf(itensOrdenados);
   } catch (err) {
-    console.error("Falha ao preparar imagens do PDF", err);
-    toast("Erro ao montar imagens do PDF — veja o console (F12)");
-    return;
+    console.warn("Falha ao preparar ícones do PDF — seguindo sem eles", err);
+  }
+  try {
+    logoPng = await logoMarcaParaPng(96);
+  } catch (err) {
+    console.warn("Falha ao preparar o logo do PDF — seguindo sem ele", err);
   }
 
   const { jsPDF } = window.jspdf;
