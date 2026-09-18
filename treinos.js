@@ -775,11 +775,10 @@ async function gerarPdfTreino(treino) {
   }
 
   const nomeArquivo = `treino-${aluno.nome.toLowerCase().replace(/\s+/g, "-")}-${isoDate(new Date())}.pdf`;
-  doc.save(nomeArquivo);
+  const blob = doc.output("blob");
 
   toast("Enviando PDF para o Google Drive...");
   try {
-    const blob = doc.output("blob");
     const { link } = await uploadPdfParaDrive(blob, nomeArquivo);
     const { error } = await sb.from("treinos").update({ pdf_url: link }).eq("id", treino.id);
     if (error) throw error;
@@ -787,6 +786,12 @@ async function gerarPdfTreino(treino) {
     carregarHistoricoTreinos();
   } catch (err) {
     console.error(err);
-    toast("PDF baixado, mas o envio ao Drive falhou");
+    toast("Falha ao enviar para o Drive — tente gerar de novo");
   }
+
+  // Faz por último de propósito: em alguns navegadores (principalmente
+  // no iPhone) isto abre o PDF numa aba em vez de baixar, o que pode
+  // interromper o restante do código — por isso o envio ao Drive
+  // já aconteceu antes disso.
+  doc.save(nomeArquivo);
 }
