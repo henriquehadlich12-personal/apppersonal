@@ -521,6 +521,13 @@ async function iniciar() {
   document.getElementById("topbar-mark").innerHTML = LOGO_MARK_SVG.replaceAll("logoGradMark", "logoGradMarkTopbar");
   document.getElementById("splash-mark").innerHTML = LOGO_MARK_SVG.replaceAll("logoGradMark", "logoGradMarkSplash");
 
+  // Se a página acabou de voltar do login do Google (redirecionamento
+  // usado dentro do app instalado), pega o token da URL e o id do
+  // treino que ficou pendente.
+  const treinoIdPendente = typeof processarRetornoDriveRedirect === "function"
+    ? processarRetornoDriveRedirect()
+    : null;
+
   const inicioCarregamento = Date.now();
   const { data, error } = await sb.from("alunos").select("*").order("nome", { ascending: true });
   if (!error) alunosCache = data;
@@ -535,6 +542,10 @@ async function iniciar() {
     splash.classList.add("is-hiding");
     setTimeout(() => splash.classList.add("is-hidden"), 450);
   }, espera);
+
+  if (treinoIdPendente && typeof retomarGeracaoPdfAposLogin === "function") {
+    await retomarGeracaoPdfAposLogin(treinoIdPendente);
+  }
 }
 
 iniciar();

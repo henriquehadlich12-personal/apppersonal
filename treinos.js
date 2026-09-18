@@ -456,6 +456,36 @@ async function excluirTodosTreinos() {
 }
 
 // ------------------------------------------------------------
+// Retomar a geração do PDF depois de voltar do login do Google
+// (usado quando o app está instalado e precisou redirecionar a
+// página inteira em vez de abrir um pop-up)
+// ------------------------------------------------------------
+
+async function retomarGeracaoPdfAposLogin(treinoId) {
+  const { data: treino, error } = await sb
+    .from("treinos")
+    .select("*, treino_itens(*)")
+    .eq("id", treinoId)
+    .single();
+  if (error || !treino) {
+    console.error("Não foi possível retomar a geração do PDF", error);
+    return;
+  }
+
+  alunoTreinoSelecionadoId = treino.aluno_id;
+
+  const tabTreinos = document.querySelector('.bottom-tab[data-view="treinos"]');
+  if (tabTreinos) tabTreinos.click();
+
+  await carregarFotosEquipamento();
+  const selectAluno = document.getElementById("select-aluno-treino");
+  if (selectAluno) selectAluno.value = treino.aluno_id;
+
+  toast("Retomando geração do PDF...");
+  await gerarPdfTreino(treino);
+}
+
+// ------------------------------------------------------------
 // Conversão de imagens (croqui/foto/logo) para uso no PDF
 // ------------------------------------------------------------
 
@@ -571,7 +601,7 @@ async function gerarPdfTreino(treino) {
   // de considerar o pop-up parte do clique do usuário e bloqueia ele
   // silenciosamente — por isso a promessa começa a rodar agora, mesmo
   // que só seja usada mais adiante.
-  const tokenPromise = obterAccessTokenDrive();
+  const tokenPromise = obterAccessTokenDrive(treino.id);
 
   const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
   const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);

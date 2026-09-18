@@ -9,6 +9,7 @@ const DRIVE_SCOPE = "https://www.googleapis.com/auth/drive.file";
 let driveTokenClient = null;
 let driveAccessToken = null;
 let driveTokenExpiraEm = 0;
+const DRIVE_REDIRECT_KEY = "drive_pending_treino_id";
 
 function obterDriveTokenClient() {
   if (!driveTokenClient) {
@@ -21,12 +22,56 @@ function obterDriveTokenClient() {
   return driveTokenClient;
 }
 
-function obterAccessTokenDrive() {
+// Apps instalados (ícone na área de trabalho / "adicionar à tela inicial")
+// rodam numa janela sem abas — nesse contexto o pop-up de login do Google
+// costuma ser bloqueado ou abrir escondido. Detectamos isso e usamos
+// redirecionamento de página inteira nesse caso, que sempre funciona.
+function estaRodandoComoAppInstalado() {
+  return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+}
+
+function iniciarLoginDriveViaRedirect(treinoId) {
+  if (treinoId) sessionStorage.setItem(DRIVE_REDIRECT_KEY, treinoId);
+  const redirectUri = window.location.origin + window.location.pathname;
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "token",
+    scope: DRIVE_SCOPE,
+    include_granted_scopes: "true",
+    prompt: "consent",
+  });
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+// Chamar uma vez ao carregar a página: se a URL veio de volta do login do
+// Google (redirecionamento), extrai o token da hash e devolve o id do
+// treino que estava pendente, pra retomar a geração do PDF sozinho.
+function processarRetornoDriveRedirect() {
+  if (!window.location.hash.includes("access_token")) return null;
+  const params = new URLSearchParams(window.location.hash.substring(1));
+  const token = params.get("access_token");
+  const expiresIn = parseInt(params.get("expires_in") || "3600", 10);
+  if (token) {
+    driveAccessToken = token;
+    driveTokenExpiraEm = Date.now() + (expiresIn - 60) * 1000;
+  }
+  history.replaceState(null, "", window.location.pathname + window.location.search);
+  const treinoIdPendente = sessionStorage.getItem(DRIVE_REDIRECT_KEY);
+  sessionStorage.removeItem(DRIVE_REDIRECT_KEY);
+  return treinoIdPendente;
+}
+
+function obterAccessTokenDrive(treinoIdParaRetomar) {
   return new Promise((resolve, reject) => {
     const agora = Date.now();
     if (driveAccessToken && agora < driveTokenExpiraEm) {
       resolve(driveAccessToken);
       return;
+    }
+    if (estaRodandoComoAppInstalado()) {
+      iniciarLoginDriveViaRedirect(treinoIdParaRetomar);
+      return; // a página vai navegar pro Google agora
     }
     const client = obterDriveTokenClient();
     client.callback = (resposta) => {
