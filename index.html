@@ -8,7 +8,16 @@
 </head>
 <body>
 
+  <!-- ==================== SPLASH ==================== -->
+  <div id="splash-screen" class="splash">
+    <div id="splash-mark" class="splash-mark"></div>
+    <div class="splash-wordmark">HENRIQUE HADLICH</div>
+    <div class="splash-tagline">PERSONAL TRAINER</div>
+    <div class="splash-loader"><div class="splash-loader-bar"></div></div>
+  </div>
+
   <header class="topbar">
+    <div id="topbar-mark" class="topbar-mark"></div>
     <div class="brand">Agenda</div>
   </header>
 
@@ -110,6 +119,10 @@
         <div class="field">
           <label class="field-label" for="input-item-obs">Observações</label>
           <input type="text" id="input-item-obs" class="field-input" placeholder="Ex: cadência lenta na descida" />
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-item-video">Link do vídeo (opcional)</label>
+          <input type="url" id="input-item-video" class="field-input" placeholder="https://youtube.com/..." />
         </div>
         <div class="sheet-actions">
           <button type="submit" class="primary-btn">Adicionar ao treino</button>
@@ -240,12 +253,15 @@
     </div>
   </div>
 
+  <input type="file" id="input-foto-equipamento" accept="image/*" class="is-hidden" />
+
   <div id="toast" class="toast is-hidden"></div>
 
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="config.js"></script>
+  <script src="logo.js"></script>
   <script src="equipamentos.js"></script>
   <script src="app.js"></script>
   <script src="drive.js"></script>

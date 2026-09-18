@@ -7,8 +7,10 @@ const NOME_PERSONAL = "Henrique Mateus Hadlich";
 let treinosInicializado = false;
 let alunoTreinoSelecionadoId = null;
 let categoriaAtiva = "Todos";
-let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes }
+let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes, video_url }
 let equipamentoEmEdicao = null;
+let equipamentoFotosCache = {}; // { equipamento_id: foto_url }
+let equipamentoUploadAtual = null;
 
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return null;
@@ -22,9 +24,19 @@ function calcularIdade(dataNascimento) {
   return idade;
 }
 
+async function carregarFotosEquipamento() {
+  const { data, error } = await sb.from("equipamento_fotos").select("*");
+  if (error) {
+    console.error(error);
+    return;
+  }
+  equipamentoFotosCache = Object.fromEntries(data.map((f) => [f.equipamento_id, f.foto_url]));
+}
+
 function inicializarTreinos() {
   popularSelectAlunoTreino();
   renderChipsCategoria();
+  carregarFotosEquipamento().then(renderEquipGrid);
   renderEquipGrid();
   if (!treinosInicializado) {
     document.getElementById("select-aluno-treino").addEventListener("change", (e) => {
@@ -38,6 +50,7 @@ function inicializarTreinos() {
       document.getElementById("sheet-item-treino").classList.add("is-hidden");
     });
     document.getElementById("form-item-treino").addEventListener("submit", confirmarItemTreino);
+    document.getElementById("input-foto-equipamento").addEventListener("change", handleFotoEquipamentoSelecionada);
     treinosInicializado = true;
   }
   atualizarConteudoTreino();
@@ -105,6 +118,13 @@ function renderChipsCategoria() {
   });
 }
 
+function visualEquipamentoHtml(equip) {
+  const foto = equipamentoFotosCache[equip.id];
+  return foto
+    ? `<img src="${foto}" class="equip-visual" alt="${equip.nome}" />`
+    : equip.svg;
+}
+
 function renderEquipGrid() {
   const grid = document.getElementById("equip-grid");
   grid.innerHTML = "";
@@ -116,10 +136,59 @@ function renderEquipGrid() {
     const card = document.createElement("button");
     card.type = "button";
     card.className = "equip-card";
-    card.innerHTML = `<div class="equip-icon">${equip.svg}</div><div class="equip-nome">${equip.nome}</div>`;
+    card.innerHTML = `
+      <button type="button" class="equip-card-photo-btn" aria-label="Adicionar foto real">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>
+      </button>
+      <div class="equip-icon">${visualEquipamentoHtml(equip)}</div>
+      <div class="equip-nome">${equip.nome}</div>`;
     card.addEventListener("click", () => abrirSheetItemTreino(equip));
+    card.querySelector(".equip-card-photo-btn").addEventListener("click", (e) => {
+      e.stopPropagation();
+      equipamentoUploadAtual = equip;
+      document.getElementById("input-foto-equipamento").click();
+    });
     grid.appendChild(card);
   });
+}
+
+async function handleFotoEquipamentoSelecionada(e) {
+  const file = e.target.files[0];
+  e.target.value = ""; // permite escolher o mesmo arquivo de novo depois
+  if (!file || !equipamentoUploadAtual) return;
+
+  toast("Enviando foto...");
+  const extensao = file.name.split(".").pop().toLowerCase();
+  const caminho = `${equipamentoUploadAtual.id}.${extensao}`;
+
+  const { error: erroUpload } = await sb.storage
+    .from("equipamentos")
+    .upload(caminho, file, { upsert: true, contentType: file.type });
+
+  if (erroUpload) {
+    toast("Erro ao enviar foto — veja o README (bucket do Storage)");
+    console.error(erroUpload);
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from("equipamentos").getPublicUrl(caminho);
+  // Timestamp no final evita que o navegador mostre a foto antiga em cache
+  // depois de trocar a imagem do mesmo equipamento.
+  const fotoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+
+  const { error: erroSalvar } = await sb
+    .from("equipamento_fotos")
+    .upsert({ equipamento_id: equipamentoUploadAtual.id, foto_url: fotoUrl });
+
+  if (erroSalvar) {
+    toast("Erro ao salvar referência da foto");
+    console.error(erroSalvar);
+    return;
+  }
+
+  equipamentoFotosCache[equipamentoUploadAtual.id] = fotoUrl;
+  toast("Foto atualizada");
+  renderEquipGrid();
 }
 
 // ------------------------------------------------------------
@@ -142,6 +211,7 @@ function confirmarItemTreino(e) {
     repeticoes: document.getElementById("input-item-reps").value || null,
     carga: document.getElementById("input-item-carga").value || null,
     observacoes: document.getElementById("input-item-obs").value || null,
+    video_url: document.getElementById("input-item-video").value || null,
   });
   document.getElementById("sheet-item-treino").classList.add("is-hidden");
   renderTreinoDraftList();
@@ -163,13 +233,14 @@ function renderTreinoDraftList() {
     const row = document.createElement("div");
     row.className = "draft-item";
     row.innerHTML = `
-      <div class="equip-icon equip-icon-sm">${equip.svg}</div>
+      <div class="equip-icon equip-icon-sm">${visualEquipamentoHtml(equip)}</div>
       <div class="draft-item-info">
         <div class="draft-item-nome">${equip.nome}</div>
         <div class="draft-item-sub">
           ${item.series ? item.series + "x " : ""}${item.repeticoes || ""}${item.carga ? " · " + item.carga : ""}
         </div>
         ${item.observacoes ? `<div class="draft-item-obs">${item.observacoes}</div>` : ""}
+        ${item.video_url ? `<a href="${item.video_url}" target="_blank" rel="noopener" class="draft-item-video">▶ Ver vídeo</a>` : ""}
       </div>
       <button type="button" class="icon-action icon-action-danger" aria-label="Remover">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -291,7 +362,7 @@ function renderHistoricoTreinos(treinos) {
 }
 
 // ------------------------------------------------------------
-// Ícone do equipamento como imagem (usado dentro do PDF)
+// Conversão de imagens (croqui/foto/logo) para uso no PDF
 // ------------------------------------------------------------
 
 function desenharFundoArredondado(ctx, x, y, w, h, r) {
@@ -304,44 +375,81 @@ function desenharFundoArredondado(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-function svgParaPng(svgString, tamanho) {
+// Carrega qualquer imagem (foto real ou croqui) e devolve um PNG
+// quadrado, sempre do mesmo tamanho — recorte "cover", então uma
+// foto retrato, paisagem ou quadrada saem todas uniformes.
+function carregarImagemQuadrada(src, tamanho, comCrossOrigin) {
   return new Promise((resolve, reject) => {
-    const svgComNamespace = svgString.replace("<svg ", '<svg xmlns="http://www.w3.org/2000/svg" ');
-    const svg64 = btoa(unescape(encodeURIComponent(svgComNamespace)));
     const img = new Image();
+    if (comCrossOrigin) img.crossOrigin = "anonymous";
     img.onload = () => {
       const canvas = document.createElement("canvas");
       canvas.width = tamanho;
       canvas.height = tamanho;
       const ctx = canvas.getContext("2d");
-      // selo colorido atrás do croqui — deixa o ícone com cara de
-      // "acabado" em vez de rascunho solto no papel
-      desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.18);
+      desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.16);
       ctx.fillStyle = "#EEF2FF";
       ctx.fill();
+      ctx.save();
+      desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.16);
+      ctx.clip();
+      const escala = Math.max(tamanho / img.naturalWidth, tamanho / img.naturalHeight);
+      const w = img.naturalWidth * escala;
+      const h = img.naturalHeight * escala;
+      ctx.drawImage(img, (tamanho - w) / 2, (tamanho - h) / 2, w, h);
+      ctx.restore();
       ctx.lineWidth = 1.5;
       ctx.strokeStyle = "#5B8CFF";
+      desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.16);
       ctx.stroke();
-      const pad = tamanho * 0.18;
-      ctx.drawImage(img, pad, pad, tamanho - pad * 2, tamanho - pad * 2);
       resolve(canvas.toDataURL("image/png"));
     };
     img.onerror = reject;
-    img.src = "data:image/svg+xml;base64," + svg64;
+    img.src = src;
   });
+}
+
+function svgComNamespaceEtamanho(svgString, largura, altura) {
+  const comNamespace = svgString.replace("<svg ", `<svg xmlns="http://www.w3.org/2000/svg" width="${largura}" height="${altura}" `);
+  return "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(comNamespace)));
+}
+
+// Ícone (croqui) sempre tem viewBox 48x48, então funciona direto
+// com carregarImagemQuadrada. Foto real usa a URL do Storage.
+async function iconeOuFotoParaPng(equip, tamanho) {
+  const fotoUrl = equip ? equipamentoFotosCache[equip.id] : null;
+  if (fotoUrl) {
+    try {
+      return await carregarImagemQuadrada(fotoUrl, tamanho, true);
+    } catch (e) {
+      console.warn("Falha ao carregar foto do equipamento, usando croqui", e);
+    }
+  }
+  if (!equip) return null;
+  return carregarImagemQuadrada(svgComNamespaceEtamanho(equip.svg, 48, 48), tamanho);
 }
 
 async function precarregarIconesPdf(itens) {
   const idsUnicos = [...new Set(itens.map((i) => i.equipamento_id))];
   const pares = await Promise.all(
-    idsUnicos.map(async (id) => {
-      const equip = equipamentoPorId(id);
-      if (!equip) return [id, null];
-      const png = await svgParaPng(equip.svg, 120);
-      return [id, png];
-    })
+    idsUnicos.map(async (id) => [id, await iconeOuFotoParaPng(equipamentoPorId(id), 140)])
   );
   return Object.fromEntries(pares);
+}
+
+function logoMarcaParaPng(tamanho) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = tamanho;
+      canvas.height = tamanho;
+      canvas.getContext("2d").drawImage(img, 0, 0, tamanho, tamanho);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = reject;
+    img.src = svgComNamespaceEtamanho(LOGO_MARK_SVG, tamanho, tamanho);
+  });
 }
 
 // ------------------------------------------------------------
@@ -357,85 +465,127 @@ async function gerarPdfTreino(treino) {
   const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
 
   toast("Montando PDF...");
-  const iconesPng = await precarregarIconesPdf(itensOrdenados);
+  const [iconesPng, logoPng] = await Promise.all([
+    precarregarIconesPdf(itensOrdenados),
+    logoMarcaParaPng(96),
+  ]);
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
 
   const larguraPagina = doc.internal.pageSize.getWidth();
+  const alturaPagina = doc.internal.pageSize.getHeight();
   const margem = 40;
   let y = 0;
 
-  // Cabeçalho
+  // ---------- Cabeçalho ----------
+  const alturaHeader = 96;
   doc.setFillColor(18, 20, 26);
-  doc.rect(0, 0, larguraPagina, 90, "F");
+  doc.rect(0, 0, larguraPagina, alturaHeader, "F");
+  doc.setFillColor(91, 140, 255);
+  doc.rect(0, alturaHeader - 3, larguraPagina, 3, "F");
+
+  doc.addImage(logoPng, "PNG", margem, 24, 40, 40);
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(20);
-  doc.text("Ficha de Treino", margem, 42);
+  doc.setFontSize(16);
+  doc.text("HENRIQUE HADLICH", margem + 52, 42);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.setTextColor(200, 205, 215);
-  doc.text(`Personal Trainer: ${NOME_PERSONAL}`, margem, 64);
+  doc.setFontSize(9);
+  doc.setTextColor(180, 186, 199);
+  if (doc.setCharSpace) doc.setCharSpace(1.4);
+  doc.text("PERSONAL TRAINER", margem + 52, 56);
+  if (doc.setCharSpace) doc.setCharSpace(0);
 
-  y = 120;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.setTextColor(255, 255, 255);
+  doc.text("Ficha de Treino", larguraPagina - margem, 48, { align: "right" });
 
-  // Card do aluno
+  y = alturaHeader + 30;
+
+  // ---------- Card do aluno ----------
+  const alturaCardAluno = 74;
   doc.setDrawColor(230, 230, 230);
   doc.setFillColor(247, 247, 249);
-  doc.roundedRect(margem, y, larguraPagina - margem * 2, 70, 8, 8, "FD");
+  doc.roundedRect(margem, y, larguraPagina - margem * 2, alturaCardAluno, 10, 10, "FD");
+
+  doc.setFillColor(91, 140, 255);
+  doc.circle(margem + 32, y + 37, 20, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(aluno.nome.charAt(0).toUpperCase(), margem + 32, y + 42, { align: "center" });
+
   doc.setTextColor(20, 20, 20);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(14);
-  doc.text(aluno.nome, margem + 16, y + 28);
+  doc.text(aluno.nome, margem + 64, y + 30);
 
   const idade = calcularIdade(aluno.data_nascimento);
-  const infoPartes = [];
-  if (idade !== null) infoPartes.push(`${idade} anos`);
-  if (aluno.peso_kg) infoPartes.push(`${aluno.peso_kg} kg`);
-  if (aluno.altura_m) infoPartes.push(`${aluno.altura_m} m`);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(11);
-  doc.setTextColor(90, 90, 90);
-  doc.text(infoPartes.join("   ·   "), margem + 16, y + 48);
+  const pills = [];
+  if (idade !== null) pills.push(`${idade} anos`);
+  if (aluno.peso_kg) pills.push(`${aluno.peso_kg} kg`);
+  if (aluno.altura_m) pills.push(`${aluno.altura_m} m`);
 
-  y += 100;
+  let pillX = margem + 64;
+  const pillY = y + 42;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9);
+  pills.forEach((texto) => {
+    const largura = doc.getTextWidth(texto) + 16;
+    doc.setFillColor(228, 235, 255);
+    doc.roundedRect(pillX, pillY, largura, 18, 9, 9, "F");
+    doc.setTextColor(60, 90, 200);
+    doc.text(texto, pillX + largura / 2, pillY + 12.5, { align: "center" });
+    pillX += largura + 8;
+  });
+
+  y += alturaCardAluno + 26;
 
   if (treino.titulo) {
+    doc.setDrawColor(91, 140, 255);
+    doc.setLineWidth(2.5);
+    doc.line(margem, y, margem + 26, y);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(13);
     doc.setTextColor(20, 20, 20);
-    doc.text(treino.titulo, margem, y);
-    y += 24;
+    doc.text(treino.titulo, margem + 34, y + 4);
+    y += 26;
   }
 
+  // ---------- Lista de exercícios (zebra + ícone/foto + vídeo) ----------
   const iconeTamanho = 40;
 
   itensOrdenados.forEach((item, index) => {
     const equip = equipamentoPorId(item.equipamento_id);
-    const alturaBloco = item.observacoes ? 62 : 50;
+    const temVideo = !!item.video_url;
+    const alturaBloco = 46 + (item.observacoes ? 15 : 0) + (temVideo ? 14 : 0);
 
-    if (y + alturaBloco > doc.internal.pageSize.getHeight() - 50) {
+    if (y + alturaBloco > alturaPagina - 60) {
       doc.addPage();
       y = 50;
     }
 
-    doc.setDrawColor(225, 225, 225);
-    doc.setFillColor(255, 255, 255);
-    doc.roundedRect(margem, y, larguraPagina - margem * 2, alturaBloco, 6, 6, "FD");
+    if (index % 2 === 0) {
+      doc.setFillColor(248, 248, 250);
+      doc.rect(margem, y, larguraPagina - margem * 2, alturaBloco, "F");
+    }
 
     const png = iconesPng[item.equipamento_id];
     if (png) {
-      doc.addImage(png, "PNG", margem + 8, y + (alturaBloco - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
+      doc.addImage(png, "PNG", margem + 6, y + (alturaBloco - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
     }
 
-    const textoX = margem + iconeTamanho + 20;
+    const textoX = margem + iconeTamanho + 22;
+    let linhaY = y + 18;
 
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, textoX, y + 22);
+    doc.text(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, textoX, linhaY);
 
+    linhaY += 16;
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     doc.setTextColor(100, 100, 100);
@@ -444,23 +594,41 @@ async function gerarPdfTreino(treino) {
       item.repeticoes ? `${item.repeticoes} repetições` : null,
       item.carga ? `Carga: ${item.carga}` : null,
     ].filter(Boolean).join("   ·   ");
-    doc.text(detalhes, textoX, y + 38);
+    doc.text(detalhes, textoX, linhaY);
 
     if (item.observacoes) {
+      linhaY += 15;
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9.5);
       doc.setTextColor(140, 140, 140);
-      doc.text(item.observacoes, textoX, y + 53);
+      doc.text(item.observacoes, textoX, linhaY);
     }
 
-    y += alturaBloco + 10;
+    if (temVideo) {
+      linhaY += 14;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9.5);
+      doc.setTextColor(91, 140, 255);
+      doc.textWithLink("▶ Ver vídeo do exercício", textoX, linhaY, { url: item.video_url });
+    }
+
+    y += alturaBloco + 8;
   });
 
-  const dataGeracao = new Date().toLocaleDateString("pt-BR");
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
-  doc.setTextColor(160, 160, 160);
-  doc.text(`Gerado em ${dataGeracao}`, margem, doc.internal.pageSize.getHeight() - 24);
+  // ---------- Rodapé (com contagem total de páginas) ----------
+  const totalPaginas = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= totalPaginas; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(230, 230, 230);
+    doc.setLineWidth(0.5);
+    doc.line(margem, alturaPagina - 34, larguraPagina - margem, alturaPagina - 34);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(150, 150, 150);
+    doc.text(`${NOME_PERSONAL} · Personal Trainer`, margem, alturaPagina - 20);
+    doc.text(`Página ${p} de ${totalPaginas}`, larguraPagina - margem, alturaPagina - 20, { align: "right" });
+  }
 
   const nomeArquivo = `treino-${aluno.nome.toLowerCase().replace(/\s+/g, "-")}-${isoDate(new Date())}.pdf`;
   doc.save(nomeArquivo);

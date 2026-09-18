@@ -516,9 +516,23 @@ async function excluirAluno(aluno) {
 // ------------------------------------------------------------
 
 async function iniciar() {
+  document.getElementById("topbar-mark").innerHTML = LOGO_MARK_SVG;
+  document.getElementById("splash-mark").innerHTML = LOGO_MARK_SVG;
+
+  const inicioCarregamento = Date.now();
   const { data, error } = await sb.from("alunos").select("*").order("nome", { ascending: true });
   if (!error) alunosCache = data;
-  carregarAgendaDoDia();
+  await carregarAgendaDoDia();
+
+  // Mantém o splash visível por pelo menos ~900ms mesmo se os dados
+  // carregarem rápido, pra marca não só "piscar" na tela.
+  const tempoDecorrido = Date.now() - inicioCarregamento;
+  const espera = Math.max(0, 900 - tempoDecorrido);
+  setTimeout(() => {
+    const splash = document.getElementById("splash-screen");
+    splash.classList.add("is-hiding");
+    setTimeout(() => splash.classList.add("is-hidden"), 450);
+  }, espera);
 }
 
 iniciar();
