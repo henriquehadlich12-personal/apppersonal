@@ -564,6 +564,14 @@ async function gerarPdfTreino(treino) {
     toast("Biblioteca de PDF não carregada — veja o README");
     return;
   }
+
+  // Pede a autorização do Google JÁ NA PRIMEIRA LINHA, antes de montar
+  // o PDF. Se isso for adiado (depois de vários "await"), o Chrome deixa
+  // de considerar o pop-up parte do clique do usuário e bloqueia ele
+  // silenciosamente — por isso a promessa começa a rodar agora, mesmo
+  // que só seja usada mais adiante.
+  const tokenPromise = obterAccessTokenDrive();
+
   const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
   const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
 
@@ -779,7 +787,7 @@ async function gerarPdfTreino(treino) {
 
   toast("Enviando PDF para o Google Drive...");
   try {
-    const { link } = await uploadPdfParaDrive(blob, nomeArquivo);
+    const { link } = await uploadPdfParaDrive(blob, nomeArquivo, tokenPromise);
     const { error } = await sb.from("treinos").update({ pdf_url: link }).eq("id", treino.id);
     if (error) throw error;
     toast("PDF salvo no Drive!");

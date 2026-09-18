@@ -44,8 +44,8 @@ function obterAccessTokenDrive() {
   });
 }
 
-async function uploadPdfParaDrive(blob, nomeArquivo) {
-  const token = await obterAccessTokenDrive();
+async function uploadPdfParaDrive(blob, nomeArquivo, tokenPromise) {
+  const token = await tokenPromise;
 
   const metadata = { name: nomeArquivo, mimeType: "application/pdf" };
   const form = new FormData();
