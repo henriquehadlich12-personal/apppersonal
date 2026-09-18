@@ -397,6 +397,7 @@ function renderHistoricoTreinos(treinos) {
       </div>
       <div class="historico-actions">
         <button class="secondary-btn historico-btn" data-action="pdf">Gerar PDF</button>
+        ${treino.pdf_url ? `<a class="secondary-btn historico-btn" href="${treino.pdf_url}" target="_blank" rel="noopener">Abrir PDF</a>` : ""}
         <a class="whatsapp-mini-btn ${treino.pdf_url ? "" : "is-disabled"}" data-action="whats" href="#">WhatsApp</a>
         <button class="historico-delete-btn" data-action="editar" aria-label="Editar treino">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -790,16 +791,16 @@ async function gerarPdfTreino(treino) {
     const { link } = await uploadPdfParaDrive(blob, nomeArquivo, tokenPromise);
     const { error } = await sb.from("treinos").update({ pdf_url: link }).eq("id", treino.id);
     if (error) throw error;
-    toast("PDF salvo no Drive!");
+    toast("PDF pronto — toque em \"Abrir PDF\" para ver ou baixar");
     carregarHistoricoTreinos();
   } catch (err) {
     console.error(err);
     toast("Falha ao enviar para o Drive — tente gerar de novo");
   }
 
-  // Faz por último de propósito: em alguns navegadores (principalmente
-  // no iPhone) isto abre o PDF numa aba em vez de baixar, o que pode
-  // interromper o restante do código — por isso o envio ao Drive
-  // já aconteceu antes disso.
-  doc.save(nomeArquivo);
+  // Importante: NÃO chamamos doc.save() aqui. Em vários navegadores
+  // móveis (Safari principalmente) isso navega a aba inteira pro PDF
+  // em vez de baixar, derrubando o app no meio do processo. O link do
+  // Drive já foi salvo acima — o próprio card do histórico ganha um
+  // botão "Abrir PDF" assim que a lista é atualizada.
 }
