@@ -465,10 +465,18 @@ async function gerarPdfTreino(treino) {
   const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
 
   toast("Montando PDF...");
-  const [iconesPng, logoPng] = await Promise.all([
-    precarregarIconesPdf(itensOrdenados),
-    logoMarcaParaPng(96),
-  ]);
+  let iconesPng = {};
+  let logoPng = null;
+  try {
+    [iconesPng, logoPng] = await Promise.all([
+      precarregarIconesPdf(itensOrdenados),
+      logoMarcaParaPng(96),
+    ]);
+  } catch (err) {
+    console.error("Falha ao preparar imagens do PDF", err);
+    toast("Erro ao montar imagens do PDF — veja o console (F12)");
+    return;
+  }
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: "pt", format: "a4" });
@@ -485,7 +493,9 @@ async function gerarPdfTreino(treino) {
   doc.setFillColor(91, 140, 255);
   doc.rect(0, alturaHeader - 3, larguraPagina, 3, "F");
 
-  doc.addImage(logoPng, "PNG", margem, 24, 40, 40);
+  if (logoPng) {
+    doc.addImage(logoPng, "PNG", margem, 24, 40, 40);
+  }
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
