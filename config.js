@@ -10,4 +10,4 @@ const SUPABASE_ANON_KEY = "sb_publishable_2uUIkDFidpyLtVtPI268Mw_HKBNXQ1v";
 
 // OAuth Client ID do Google Cloud (tipo "Web application"), usado para
 // autorizar o upload do PDF do treino no Google Drive do personal.
-const GOOGLE_CLIENT_ID = "COLE_AQUI_O_CLIENT_ID.apps.googleusercontent.com";
+const GOOGLE_CLIENT_ID = "451567830435-k3u3s4qac26i9glsf78bpf9j62e1ap4f.apps.googleusercontent.com";
