@@ -11,6 +11,7 @@ let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, obser
 let equipamentoEmEdicao = null;
 let equipamentoFotosCache = {}; // { equipamento_id: foto_url }
 let equipamentoUploadAtual = null;
+let treinoEmEdicaoId = null;
 
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return null;
@@ -41,8 +42,7 @@ function inicializarTreinos() {
   if (!treinosInicializado) {
     document.getElementById("select-aluno-treino").addEventListener("change", (e) => {
       alunoTreinoSelecionadoId = e.target.value || null;
-      treinoDraftItems = [];
-      renderTreinoDraftList();
+      cancelarEdicaoTreino();
       atualizarConteudoTreino();
     });
     document.getElementById("btn-salvar-treino").addEventListener("click", salvarTreino);
@@ -52,6 +52,7 @@ function inicializarTreinos() {
     document.getElementById("form-item-treino").addEventListener("submit", confirmarItemTreino);
     document.getElementById("input-foto-equipamento").addEventListener("change", handleFotoEquipamentoSelecionada);
     document.getElementById("btn-excluir-todos-treinos").addEventListener("click", excluirTodosTreinos);
+    document.getElementById("btn-cancelar-edicao-treino").addEventListener("click", cancelarEdicaoTreino);
     treinosInicializado = true;
   }
   atualizarConteudoTreino();
@@ -241,7 +242,7 @@ function renderTreinoDraftList() {
           ${item.series ? item.series + "x " : ""}${item.repeticoes || ""}${item.carga ? " · " + item.carga : ""}
         </div>
         ${item.observacoes ? `<div class="draft-item-obs">${item.observacoes}</div>` : ""}
-        ${item.video_url ? `<a href="${item.video_url}" target="_blank" rel="noopener" class="draft-item-video">▶ Ver vídeo</a>` : ""}
+        ${item.video_url ? `<a href="${item.video_url}" target="_blank" rel="noopener" class="draft-item-video">Link de apoio: ${item.video_url}</a>` : ""}
       </div>
       <button type="button" class="icon-action icon-action-danger" aria-label="Remover">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
@@ -258,6 +259,35 @@ function renderTreinoDraftList() {
 // Salvar treino no Supabase
 // ------------------------------------------------------------
 
+function editarTreino(treino) {
+  treinoEmEdicaoId = treino.id;
+  treinoDraftItems = [...treino.treino_itens]
+    .sort((a, b) => a.ordem - b.ordem)
+    .map((i) => ({
+      equipamento_id: i.equipamento_id,
+      series: i.series,
+      repeticoes: i.repeticoes,
+      carga: i.carga,
+      observacoes: i.observacoes,
+      video_url: i.video_url,
+    }));
+  document.getElementById("input-treino-titulo").value = treino.titulo || "";
+  document.getElementById("btn-salvar-treino").textContent = "Salvar alterações";
+  document.getElementById("btn-cancelar-edicao-treino").classList.remove("is-hidden");
+  renderTreinoDraftList();
+  toast("Editando treino — ajuste e salve");
+  document.getElementById("treino-conteudo").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function cancelarEdicaoTreino() {
+  treinoEmEdicaoId = null;
+  treinoDraftItems = [];
+  document.getElementById("input-treino-titulo").value = "";
+  document.getElementById("btn-salvar-treino").textContent = "Salvar treino";
+  document.getElementById("btn-cancelar-edicao-treino").classList.add("is-hidden");
+  renderTreinoDraftList();
+}
+
 async function salvarTreino() {
   if (!alunoTreinoSelecionadoId) {
     toast("Selecione um aluno");
@@ -269,21 +299,44 @@ async function salvarTreino() {
   }
 
   const titulo = document.getElementById("input-treino-titulo").value || null;
+  let treinoId;
 
-  const { data: treino, error: erroTreino } = await sb
-    .from("treinos")
-    .insert([{ aluno_id: alunoTreinoSelecionadoId, titulo }])
-    .select()
-    .single();
-
-  if (erroTreino) {
-    toast("Erro ao salvar treino");
-    console.error(erroTreino);
-    return;
+  if (treinoEmEdicaoId) {
+    // Ao editar, zera o pdf_url — o PDF/link antigo não reflete mais
+    // o treino atualizado, então o botão de WhatsApp só volta quando
+    // um novo PDF for gerado.
+    const { error: erroUpdate } = await sb
+      .from("treinos")
+      .update({ titulo, pdf_url: null })
+      .eq("id", treinoEmEdicaoId);
+    if (erroUpdate) {
+      toast("Erro ao salvar treino");
+      console.error(erroUpdate);
+      return;
+    }
+    const { error: erroDelItens } = await sb.from("treino_itens").delete().eq("treino_id", treinoEmEdicaoId);
+    if (erroDelItens) {
+      toast("Erro ao atualizar exercícios");
+      console.error(erroDelItens);
+      return;
+    }
+    treinoId = treinoEmEdicaoId;
+  } else {
+    const { data: treino, error: erroTreino } = await sb
+      .from("treinos")
+      .insert([{ aluno_id: alunoTreinoSelecionadoId, titulo }])
+      .select()
+      .single();
+    if (erroTreino) {
+      toast("Erro ao salvar treino");
+      console.error(erroTreino);
+      return;
+    }
+    treinoId = treino.id;
   }
 
   const itens = treinoDraftItems.map((item, index) => ({
-    treino_id: treino.id,
+    treino_id: treinoId,
     ordem: index,
     ...item,
   }));
@@ -295,7 +348,10 @@ async function salvarTreino() {
     return;
   }
 
-  toast("Treino salvo");
+  toast(treinoEmEdicaoId ? "Treino atualizado" : "Treino salvo");
+  treinoEmEdicaoId = null;
+  document.getElementById("btn-salvar-treino").textContent = "Salvar treino";
+  document.getElementById("btn-cancelar-edicao-treino").classList.add("is-hidden");
   treinoDraftItems = [];
   document.getElementById("input-treino-titulo").value = "";
   renderTreinoDraftList();
@@ -342,12 +398,16 @@ function renderHistoricoTreinos(treinos) {
       <div class="historico-actions">
         <button class="secondary-btn historico-btn" data-action="pdf">Gerar PDF</button>
         <a class="whatsapp-mini-btn ${treino.pdf_url ? "" : "is-disabled"}" data-action="whats" href="#">WhatsApp</a>
+        <button class="historico-delete-btn" data-action="editar" aria-label="Editar treino">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </button>
         <button class="historico-delete-btn" data-action="excluir" aria-label="Excluir treino">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
         </button>
       </div>`;
 
     card.querySelector('[data-action="pdf"]').addEventListener("click", () => gerarPdfTreino(treino));
+    card.querySelector('[data-action="editar"]').addEventListener("click", () => editarTreino(treino));
 
     const btnWhats = card.querySelector('[data-action="whats"]');
     btnWhats.addEventListener("click", (e) => {
@@ -635,11 +695,15 @@ async function gerarPdfTreino(treino) {
     doc.setFontSize(9.5);
     const linhasObs = item.observacoes ? doc.splitTextToSize(item.observacoes, larguraTexto) : [];
 
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9.5);
+    const linhasVideo = temVideo ? doc.splitTextToSize(`Link de apoio: ${item.video_url}`, larguraTexto) : [];
+
     const alturaTexto =
       linhasTitulo.length * 15 +
       linhasDetalhes.length * 13 +
       linhasObs.length * 12 +
-      (temVideo ? 14 : 0) +
+      linhasVideo.length * 12 +
       10;
     const alturaBloco = Math.max(iconeTamanho + 16, alturaTexto);
 
@@ -686,7 +750,10 @@ async function gerarPdfTreino(treino) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(91, 140, 255);
-      doc.textWithLink("▶ Ver vídeo do exercício", textoX, linhaY, { url: item.video_url });
+      linhasVideo.forEach((linha) => {
+        doc.textWithLink(linha, textoX, linhaY, { url: item.video_url });
+        linhaY += 12;
+      });
     }
 
     y += alturaBloco + 8;

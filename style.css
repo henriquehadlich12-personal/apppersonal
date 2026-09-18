@@ -865,4 +865,5 @@ button, input, select {
   color: var(--accent);
   text-decoration: none;
   margin-top: 4px;
+  word-break: break-all;
 }
