@@ -51,6 +51,7 @@ function inicializarTreinos() {
     });
     document.getElementById("form-item-treino").addEventListener("submit", confirmarItemTreino);
     document.getElementById("input-foto-equipamento").addEventListener("change", handleFotoEquipamentoSelecionada);
+    document.getElementById("btn-excluir-todos-treinos").addEventListener("click", excluirTodosTreinos);
     treinosInicializado = true;
   }
   atualizarConteudoTreino();
@@ -341,6 +342,9 @@ function renderHistoricoTreinos(treinos) {
       <div class="historico-actions">
         <button class="secondary-btn historico-btn" data-action="pdf">Gerar PDF</button>
         <a class="whatsapp-mini-btn ${treino.pdf_url ? "" : "is-disabled"}" data-action="whats" href="#">WhatsApp</a>
+        <button class="historico-delete-btn" data-action="excluir" aria-label="Excluir treino">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>
       </div>`;
 
     card.querySelector('[data-action="pdf"]').addEventListener("click", () => gerarPdfTreino(treino));
@@ -349,7 +353,7 @@ function renderHistoricoTreinos(treinos) {
     btnWhats.addEventListener("click", (e) => {
       e.preventDefault();
       if (!treino.pdf_url) {
-        toast("Gere o PDF e configure o Google Drive primeiro");
+        toast("Gere o PDF primeiro para liberar o envio");
         return;
       }
       const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
@@ -357,8 +361,37 @@ function renderHistoricoTreinos(treinos) {
       window.open(`${buildWhatsappLink(aluno.telefone)}?text=${texto}`, "_blank");
     });
 
+    card.querySelector('[data-action="excluir"]').addEventListener("click", () => excluirTreino(treino));
+
     container.appendChild(card);
   });
+}
+
+async function excluirTreino(treino) {
+  if (!confirm(`Excluir o treino "${treino.titulo || "sem nome"}"?`)) return;
+  const { error } = await sb.from("treinos").delete().eq("id", treino.id);
+  if (error) {
+    toast("Erro ao excluir treino");
+    console.error(error);
+    return;
+  }
+  toast("Treino excluído");
+  carregarHistoricoTreinos();
+}
+
+async function excluirTodosTreinos() {
+  if (!alunoTreinoSelecionadoId) return;
+  const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
+  if (!confirm(`Excluir TODOS os treinos salvos de ${aluno ? aluno.nome : "este aluno"}? Essa ação não pode ser desfeita.`)) return;
+
+  const { error } = await sb.from("treinos").delete().eq("aluno_id", alunoTreinoSelecionadoId);
+  if (error) {
+    toast("Erro ao excluir treinos");
+    console.error(error);
+    return;
+  }
+  toast("Treinos excluídos");
+  carregarHistoricoTreinos();
 }
 
 // ------------------------------------------------------------
@@ -576,11 +609,39 @@ async function gerarPdfTreino(treino) {
 
   // ---------- Lista de exercícios (zebra + ícone/foto + vídeo) ----------
   const iconeTamanho = 68;
+  const larguraTexto = larguraPagina - margem - (margem + iconeTamanho + 22) - 14;
 
   itensOrdenados.forEach((item, index) => {
     const equip = equipamentoPorId(item.equipamento_id);
     const temVideo = !!item.video_url;
-    const alturaBloco = Math.max(iconeTamanho + 16, 62 + (item.observacoes ? 15 : 0) + (temVideo ? 14 : 0));
+    const textoX = margem + iconeTamanho + 22;
+
+    // Quebra cada trecho de texto no espaço disponível ANTES de saber
+    // a altura do bloco — assim nada fica cortado ou vazando pra fora.
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    const linhasTitulo = doc.splitTextToSize(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, larguraTexto);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    const detalhes = [
+      item.series ? `${item.series} séries` : null,
+      item.repeticoes ? `${item.repeticoes} repetições` : null,
+      item.carga ? `Carga: ${item.carga}` : null,
+    ].filter(Boolean).join("   ·   ");
+    const linhasDetalhes = detalhes ? doc.splitTextToSize(detalhes, larguraTexto) : [];
+
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9.5);
+    const linhasObs = item.observacoes ? doc.splitTextToSize(item.observacoes, larguraTexto) : [];
+
+    const alturaTexto =
+      linhasTitulo.length * 15 +
+      linhasDetalhes.length * 13 +
+      linhasObs.length * 12 +
+      (temVideo ? 14 : 0) +
+      10;
+    const alturaBloco = Math.max(iconeTamanho + 16, alturaTexto);
 
     if (y + alturaBloco > alturaPagina - 60) {
       doc.addPage();
@@ -597,35 +658,31 @@ async function gerarPdfTreino(treino) {
       doc.addImage(png, "PNG", margem + 6, y + (alturaBloco - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
     }
 
-    const textoX = margem + iconeTamanho + 22;
     let linhaY = y + 18;
 
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, textoX, linhaY);
+    doc.text(linhasTitulo, textoX, linhaY);
+    linhaY += linhasTitulo.length * 15;
 
-    linhaY += 16;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    const detalhes = [
-      item.series ? `${item.series} séries` : null,
-      item.repeticoes ? `${item.repeticoes} repetições` : null,
-      item.carga ? `Carga: ${item.carga}` : null,
-    ].filter(Boolean).join("   ·   ");
-    doc.text(detalhes, textoX, linhaY);
+    if (linhasDetalhes.length) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(10);
+      doc.setTextColor(100, 100, 100);
+      doc.text(linhasDetalhes, textoX, linhaY);
+      linhaY += linhasDetalhes.length * 13;
+    }
 
-    if (item.observacoes) {
-      linhaY += 15;
+    if (linhasObs.length) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9.5);
       doc.setTextColor(140, 140, 140);
-      doc.text(item.observacoes, textoX, linhaY);
+      doc.text(linhasObs, textoX, linhaY);
+      linhaY += linhasObs.length * 12;
     }
 
     if (temVideo) {
-      linhaY += 14;
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(91, 140, 255);
@@ -652,11 +709,6 @@ async function gerarPdfTreino(treino) {
 
   const nomeArquivo = `treino-${aluno.nome.toLowerCase().replace(/\s+/g, "-")}-${isoDate(new Date())}.pdf`;
   doc.save(nomeArquivo);
-
-  if (typeof GOOGLE_CLIENT_ID === "undefined" || GOOGLE_CLIENT_ID.includes("COLE_AQUI")) {
-    toast("PDF baixado. Configure o Google Drive no config.js para envio automático.");
-    return;
-  }
 
   toast("Enviando PDF para o Google Drive...");
   try {
