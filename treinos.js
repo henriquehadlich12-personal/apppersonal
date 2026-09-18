@@ -437,7 +437,7 @@ async function precarregarIconesPdf(itens) {
   const pares = await Promise.all(
     idsUnicos.map(async (id) => {
       try {
-        return [id, await iconeOuFotoParaPng(equipamentoPorId(id), 140)];
+        return [id, await iconeOuFotoParaPng(equipamentoPorId(id), 220)];
       } catch (e) {
         console.warn(`Falha total ao preparar imagem do equipamento ${id}`, e);
         return [id, null];
@@ -575,12 +575,12 @@ async function gerarPdfTreino(treino) {
   }
 
   // ---------- Lista de exercícios (zebra + ícone/foto + vídeo) ----------
-  const iconeTamanho = 40;
+  const iconeTamanho = 68;
 
   itensOrdenados.forEach((item, index) => {
     const equip = equipamentoPorId(item.equipamento_id);
     const temVideo = !!item.video_url;
-    const alturaBloco = 46 + (item.observacoes ? 15 : 0) + (temVideo ? 14 : 0);
+    const alturaBloco = Math.max(iconeTamanho + 16, 62 + (item.observacoes ? 15 : 0) + (temVideo ? 14 : 0));
 
     if (y + alturaBloco > alturaPagina - 60) {
       doc.addPage();
