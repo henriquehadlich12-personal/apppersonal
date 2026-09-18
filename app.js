@@ -524,10 +524,10 @@ async function iniciar() {
   if (!error) alunosCache = data;
   await carregarAgendaDoDia();
 
-  // Mantém o splash visível por pelo menos ~900ms mesmo se os dados
-  // carregarem rápido, pra marca não só "piscar" na tela.
+  // Mantém o splash visível por pelo menos ~3s, mesmo se os dados
+  // carregarem rápido, pra marca ter tempo de aparecer bem.
   const tempoDecorrido = Date.now() - inicioCarregamento;
-  const espera = Math.max(0, 900 - tempoDecorrido);
+  const espera = Math.max(0, 3000 - tempoDecorrido);
   setTimeout(() => {
     const splash = document.getElementById("splash-screen");
     splash.classList.add("is-hiding");
