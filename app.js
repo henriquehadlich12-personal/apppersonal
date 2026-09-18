@@ -516,8 +516,10 @@ async function excluirAluno(aluno) {
 // ------------------------------------------------------------
 
 async function iniciar() {
-  document.getElementById("topbar-mark").innerHTML = LOGO_MARK_SVG;
-  document.getElementById("splash-mark").innerHTML = LOGO_MARK_SVG;
+  // Cada injeção do logo usa um id de gradiente próprio, pra evitar
+  // ids duplicados na página (o mesmo SVG é usado em dois lugares).
+  document.getElementById("topbar-mark").innerHTML = LOGO_MARK_SVG.replaceAll("logoGradMark", "logoGradMarkTopbar");
+  document.getElementById("splash-mark").innerHTML = LOGO_MARK_SVG.replaceAll("logoGradMark", "logoGradMarkSplash");
 
   const inicioCarregamento = Date.now();
   const { data, error } = await sb.from("alunos").select("*").order("nome", { ascending: true });
