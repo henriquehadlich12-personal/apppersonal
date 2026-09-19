@@ -451,6 +451,7 @@ async function carregarAlunos() {
   }
   alunosCache = data;
   renderAlunosList();
+  renderAniversariantesHoje();
 }
 
 function renderAlunosList() {
@@ -574,6 +575,29 @@ async function excluirAluno(aluno) {
 // Inicialização
 // ------------------------------------------------------------
 
+function renderAniversariantesHoje() {
+  const hoje = new Date();
+  const mes = hoje.getMonth() + 1;
+  const dia = hoje.getDate();
+
+  const aniversariantes = alunosCache.filter((a) => {
+    if (!a.data_nascimento) return false;
+    const [, m, d] = a.data_nascimento.split("-").map(Number);
+    return m === mes && d === dia;
+  });
+
+  const banner = document.getElementById("aniversariantes-banner");
+  if (aniversariantes.length === 0) {
+    banner.classList.add("is-hidden");
+    banner.innerHTML = "";
+    return;
+  }
+
+  const nomes = aniversariantes.map((a) => a.nome).join(", ");
+  banner.innerHTML = `🎂 <strong>Aniversário hoje:</strong> ${nomes}`;
+  banner.classList.remove("is-hidden");
+}
+
 async function iniciar() {
   // Cada injeção do logo usa um id de gradiente próprio, pra evitar
   // ids duplicados na página (o mesmo SVG é usado em dois lugares).
@@ -590,6 +614,7 @@ async function iniciar() {
   const inicioCarregamento = Date.now();
   const { data, error } = await sb.from("alunos").select("*").order("nome", { ascending: true });
   if (!error) alunosCache = data;
+  renderAniversariantesHoje();
   await carregarAgendaDoDia();
 
   // Mantém o splash visível por pelo menos ~3s, mesmo se os dados

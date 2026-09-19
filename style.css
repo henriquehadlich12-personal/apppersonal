@@ -177,6 +177,16 @@ button, input, select {
   cursor: pointer;
 }
 
+.aniversario-banner {
+  margin-top: 14px;
+  background: linear-gradient(135deg, rgba(185,140,255,0.16), rgba(255,138,61,0.14));
+  border: 1px solid rgba(185,140,255,0.3);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 13px;
+  text-align: center;
+}
+
 /* ---------------- Legend ---------------- */
 
 .legend {
