@@ -6,14 +6,14 @@
 
 const LOGO_MARK_SVG = `<svg viewBox="0 0 64 64">
   <defs>
-    <linearGradient id="logoGradMark" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#5B8CFF"/>
-      <stop offset="1" stop-color="#B98CFF"/>
+    <linearGradient id="logoGradMark" gradientUnits="userSpaceOnUse" x1="4" y1="60" x2="60" y2="4">
+      <stop offset="0" stop-color="#2F6FEA"/>
+      <stop offset="1" stop-color="#FF3D82"/>
     </linearGradient>
   </defs>
-  <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#logoGradMark)"/>
-  <text x="32" y="39" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-weight="800" font-size="25" fill="#12141A" text-anchor="middle">HH</text>
-  <path d="M13 49h38M19.5 45v8M44.5 45v8" stroke="#12141A" stroke-width="2.6" stroke-linecap="round" opacity="0.55"/>
+  <rect x="7" y="5" width="13" height="54" rx="3" fill="url(#logoGradMark)"/>
+  <rect x="44" y="5" width="13" height="54" rx="3" fill="url(#logoGradMark)"/>
+  <path d="M7 41 L20 41 L57 23 L44 23 Z" fill="url(#logoGradMark)"/>
 </svg>`;
 
 // currentColor no texto: fica claro em fundo escuro (topo do app,

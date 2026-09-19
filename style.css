@@ -50,10 +50,24 @@ button, input, select {
   margin: 0 auto;
 }
 
+.brand-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .brand {
-  font-size: 24px;
+  font-size: 22px;
   font-weight: 800;
-  letter-spacing: -0.03em;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.brand-tagline {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
 }
 
 /* ---------------- Bottom bar ---------------- */
@@ -179,19 +193,21 @@ button, input, select {
 
 .aniversario-banner {
   margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.aniversario-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   background: linear-gradient(135deg, rgba(185,140,255,0.16), rgba(255,138,61,0.14));
   border: 1px solid rgba(185,140,255,0.3);
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 13px;
-}
-
-.aniversario-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 4px 0;
 }
 
 .aniversario-btn {

@@ -582,11 +582,13 @@ function renderAniversariantesHoje() {
   const hoje = new Date();
   const mes = hoje.getMonth() + 1;
   const dia = hoje.getDate();
+  const hojeIso = isoDate(hoje);
 
   const aniversariantes = alunosCache.filter((a) => {
     if (!a.data_nascimento) return false;
     const [, m, d] = a.data_nascimento.split("-").map(Number);
-    return m === mes && d === dia;
+    if (m !== mes || d !== dia) return false;
+    return a.ultimo_parabens_em !== hojeIso; // já cumprimentado hoje? some da lista
   });
 
   const banner = document.getElementById("aniversariantes-banner");
@@ -597,7 +599,7 @@ function renderAniversariantesHoje() {
   }
 
   banner.innerHTML = aniversariantes.map((a) => `
-    <div class="aniversario-item">
+    <div class="aniversario-card" data-card-id="${a.id}">
       <span>🎂 <strong>${a.nome}</strong> faz aniversário hoje!</span>
       <a class="aniversario-btn" data-id="${a.id}" href="#">Desejar parabéns</a>
     </div>
@@ -610,9 +612,23 @@ function renderAniversariantesHoje() {
     btn.href = `${buildWhatsappLink(a.telefone)}?text=${texto}`;
     btn.target = "_blank";
     btn.rel = "noopener";
+    btn.addEventListener("click", () => marcarParabensEnviados(a.id, hojeIso));
   });
 
   banner.classList.remove("is-hidden");
+}
+
+async function marcarParabensEnviados(alunoId, hojeIso) {
+  const aluno = alunosCache.find((a) => a.id === alunoId);
+  if (aluno) aluno.ultimo_parabens_em = hojeIso; // atualiza local pra sumir na hora, sem esperar o servidor
+
+  const card = document.querySelector(`.aniversario-card[data-card-id="${alunoId}"]`);
+  if (card) card.remove();
+  const banner = document.getElementById("aniversariantes-banner");
+  if (banner && !banner.querySelector(".aniversario-card")) banner.classList.add("is-hidden");
+
+  const { error } = await sb.from("alunos").update({ ultimo_parabens_em: hojeIso }).eq("id", alunoId);
+  if (error) console.error("Erro ao registrar parabéns enviados", error);
 }
 
 async function iniciar() {
