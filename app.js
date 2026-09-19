@@ -499,6 +499,7 @@ function abrirSheetAluno(aluno) {
   formAluno.reset();
   if (aluno) {
     document.getElementById("input-aluno-nome").value = aluno.nome;
+    document.getElementById("input-aluno-apelido").value = aluno.apelido || "";
     document.getElementById("input-aluno-telefone").value = aluno.telefone;
     document.getElementById("input-aluno-nascimento").value = aluno.data_nascimento || "";
     document.getElementById("input-aluno-peso").value = aluno.peso_kg || "";
@@ -514,6 +515,7 @@ document.getElementById("btn-cancelar-aluno").addEventListener("click", () => {
 formAluno.addEventListener("submit", async (e) => {
   e.preventDefault();
   const nome = document.getElementById("input-aluno-nome").value.trim();
+  const apelido = document.getElementById("input-aluno-apelido").value.trim();
   const telefone = document.getElementById("input-aluno-telefone").value.trim();
   const dataNascimento = document.getElementById("input-aluno-nascimento").value || null;
   const peso = document.getElementById("input-aluno-peso").value || null;
@@ -521,6 +523,7 @@ formAluno.addEventListener("submit", async (e) => {
 
   const payload = {
     nome,
+    apelido: apelido || null,
     telefone,
     data_nascimento: dataNascimento,
     peso_kg: peso,
@@ -602,7 +605,8 @@ function renderAniversariantesHoje() {
 
   aniversariantes.forEach((a) => {
     const btn = banner.querySelector(`[data-id="${a.id}"]`);
-    const texto = encodeURIComponent(`Parabéns, ${a.nome}! 🎉 Desejo a você um dia repleto de alegrias. Conte comigo sempre!`);
+    const nomeParaMensagem = a.apelido || a.nome;
+    const texto = encodeURIComponent(`Parabéns, ${nomeParaMensagem}! 🎉 Desejo a você um dia repleto de alegrias. Conte comigo sempre!`);
     btn.href = `${buildWhatsappLink(a.telefone)}?text=${texto}`;
     btn.target = "_blank";
     btn.rel = "noopener";

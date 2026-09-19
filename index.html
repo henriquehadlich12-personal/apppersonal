@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12141A" />
-<link rel="stylesheet" href="style.css?v=4" />
+<link rel="stylesheet" href="style.css?v=5" />
 </head>
 <body>
 
@@ -235,8 +235,12 @@
       <h2 id="sheet-aluno-titulo">Novo aluno</h2>
       <form id="form-aluno">
         <div class="field">
-          <label class="field-label" for="input-aluno-nome">Nome</label>
+          <label class="field-label" for="input-aluno-nome">Nome completo</label>
           <input type="text" id="input-aluno-nome" class="field-input" required />
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-aluno-apelido">Apelido (como prefere ser chamado)</label>
+          <input type="text" id="input-aluno-apelido" class="field-input" placeholder="Ex: Lucas" />
         </div>
         <div class="field">
           <label class="field-label" for="input-aluno-telefone">Telefone (com DDD)</label>
@@ -303,10 +307,10 @@
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
-  <script src="logo.js?v=4"></script>
-  <script src="equipamentos.js?v=4"></script>
-  <script src="app.js?v=4"></script>
-  <script src="avaliacao.js?v=4"></script>
-  <script src="treinos.js?v=4"></script>
+  <script src="logo.js?v=5"></script>
+  <script src="equipamentos.js?v=5"></script>
+  <script src="app.js?v=5"></script>
+  <script src="avaliacao.js?v=5"></script>
+  <script src="treinos.js?v=5"></script>
 </body>
 </html>
