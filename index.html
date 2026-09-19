@@ -262,6 +262,21 @@
     </div>
   </div>
 
+  <!-- ==================== SHEET: AVALIAÇÃO DE SAÚDE / ANAMNESE ==================== -->
+  <div id="sheet-avaliacao" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2 id="avaliacao-titulo">Avaliação de saúde</h2>
+      <form id="form-avaliacao">
+        <div id="avaliacao-form-container"></div>
+        <div class="sheet-actions">
+          <button type="submit" class="primary-btn">Salvar avaliação</button>
+          <button type="button" id="btn-cancelar-avaliacao" class="secondary-btn">Fechar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <input type="file" id="input-foto-equipamento" accept="image/*" class="is-hidden" />
 
   <!-- ==================== SHEET: RESULTADO DO PDF (compartilhar/baixar) ==================== -->
@@ -289,6 +304,7 @@
   <script src="logo.js"></script>
   <script src="equipamentos.js"></script>
   <script src="app.js"></script>
+  <script src="avaliacao.js"></script>
   <script src="treinos.js"></script>
 </body>
 </html>
