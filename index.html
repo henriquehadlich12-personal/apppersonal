@@ -263,15 +263,30 @@
 
   <input type="file" id="input-foto-equipamento" accept="image/*" class="is-hidden" />
 
+  <!-- ==================== SHEET: RESULTADO DO PDF (compartilhar/baixar) ==================== -->
+  <div id="sheet-pdf-resultado" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>PDF pronto</h2>
+      <div class="pdf-resultado-actions">
+        <button type="button" id="btn-pdf-compartilhar" class="primary-btn full-width">Compartilhar (WhatsApp e outros)</button>
+        <button type="button" id="btn-pdf-baixar" class="secondary-btn full-width">Baixar PDF</button>
+        <a href="#" id="btn-pdf-whatsapp" target="_blank" rel="noopener" class="whatsapp-btn">Abrir WhatsApp do aluno</a>
+        <p id="pdf-whatsapp-nota" class="pdf-whatsapp-nota is-hidden">
+          O WhatsApp não deixa anexar arquivo automaticamente por link — baixe o PDF (botão acima) e anexe manualmente na conversa que abrir.
+        </p>
+        <button type="button" id="btn-pdf-fechar" class="secondary-btn full-width">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast is-hidden"></div>
 
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
   <script src="config.js"></script>
   <script src="logo.js"></script>
   <script src="equipamentos.js"></script>
-  <script src="drive.js"></script>
   <script src="app.js"></script>
   <script src="treinos.js"></script>
 </body>

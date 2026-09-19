@@ -302,12 +302,9 @@ async function salvarTreino() {
   let treinoId;
 
   if (treinoEmEdicaoId) {
-    // Ao editar, zera o pdf_url — o PDF/link antigo não reflete mais
-    // o treino atualizado, então o botão de WhatsApp só volta quando
-    // um novo PDF for gerado.
     const { error: erroUpdate } = await sb
       .from("treinos")
-      .update({ titulo, pdf_url: null })
+      .update({ titulo })
       .eq("id", treinoEmEdicaoId);
     if (erroUpdate) {
       toast("Erro ao salvar treino");
@@ -397,8 +394,6 @@ function renderHistoricoTreinos(treinos) {
       </div>
       <div class="historico-actions">
         <button class="secondary-btn historico-btn" data-action="pdf">Gerar PDF</button>
-        ${treino.pdf_url ? `<a class="secondary-btn historico-btn" href="${treino.pdf_url}" target="_blank" rel="noopener">Abrir PDF</a>` : ""}
-        <a class="whatsapp-mini-btn ${treino.pdf_url ? "" : "is-disabled"}" data-action="whats" href="#">WhatsApp</a>
         <button class="historico-delete-btn" data-action="editar" aria-label="Editar treino">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
         </button>
@@ -409,18 +404,6 @@ function renderHistoricoTreinos(treinos) {
 
     card.querySelector('[data-action="pdf"]').addEventListener("click", () => gerarPdfTreino(treino));
     card.querySelector('[data-action="editar"]').addEventListener("click", () => editarTreino(treino));
-
-    const btnWhats = card.querySelector('[data-action="whats"]');
-    btnWhats.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (!treino.pdf_url) {
-        toast("Gere o PDF primeiro para liberar o envio");
-        return;
-      }
-      const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
-      const texto = encodeURIComponent(`Olá ${aluno.nome}! Segue seu treino: ${treino.pdf_url}`);
-      window.open(`${buildWhatsappLink(aluno.telefone)}?text=${texto}`, "_blank");
-    });
 
     card.querySelector('[data-action="excluir"]').addEventListener("click", () => excluirTreino(treino));
 
@@ -595,13 +578,6 @@ async function gerarPdfTreino(treino) {
     toast("Biblioteca de PDF não carregada — veja o README");
     return;
   }
-
-  // Pede a autorização do Google JÁ NA PRIMEIRA LINHA, antes de montar
-  // o PDF. Se isso for adiado (depois de vários "await"), o Chrome deixa
-  // de considerar o pop-up parte do clique do usuário e bloqueia ele
-  // silenciosamente — por isso a promessa começa a rodar agora, mesmo
-  // que só seja usada mais adiante.
-  const tokenPromise = obterAccessTokenDrive(treino.id);
 
   const aluno = alunosCache.find((a) => a.id === alunoTreinoSelecionadoId);
   const itensOrdenados = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
@@ -816,21 +792,68 @@ async function gerarPdfTreino(treino) {
   const nomeArquivo = `treino-${aluno.nome.toLowerCase().replace(/\s+/g, "-")}-${isoDate(new Date())}.pdf`;
   const blob = doc.output("blob");
 
-  toast("Enviando PDF para o Google Drive...");
-  try {
-    const { link } = await uploadPdfParaDrive(blob, nomeArquivo, tokenPromise);
-    const { error } = await sb.from("treinos").update({ pdf_url: link }).eq("id", treino.id);
-    if (error) throw error;
-    toast("PDF pronto — toque em \"Abrir PDF\" para ver ou baixar");
-    carregarHistoricoTreinos();
-  } catch (err) {
-    console.error(err);
-    toast("Falha ao enviar para o Drive — tente gerar de novo");
-  }
-
-  // Importante: NÃO chamamos doc.save() aqui. Em vários navegadores
-  // móveis (Safari principalmente) isso navega a aba inteira pro PDF
-  // em vez de baixar, derrubando o app no meio do processo. O link do
-  // Drive já foi salvo acima — o próprio card do histórico ganha um
-  // botão "Abrir PDF" assim que a lista é atualizada.
+  document.getElementById("toast").classList.add("is-hidden");
+  mostrarPainelResultadoPdf(blob, nomeArquivo, aluno);
 }
+
+// ------------------------------------------------------------
+// Painel de resultado do PDF — compartilhar (com o arquivo
+// anexado de verdade, via Web Share API), baixar, ou abrir o
+// WhatsApp do aluno com uma mensagem de texto.
+// ------------------------------------------------------------
+
+function podeCompartilharArquivo(blob, nomeArquivo) {
+  if (!navigator.canShare) return false;
+  try {
+    const file = new File([blob], nomeArquivo, { type: "application/pdf" });
+    return navigator.canShare({ files: [file] });
+  } catch (e) {
+    return false;
+  }
+}
+
+function mostrarPainelResultadoPdf(blob, nomeArquivo, aluno) {
+  const podeCompartilhar = podeCompartilharArquivo(blob, nomeArquivo);
+  const btnCompartilhar = document.getElementById("btn-pdf-compartilhar");
+  const btnWhats = document.getElementById("btn-pdf-whatsapp");
+  const notaWhats = document.getElementById("pdf-whatsapp-nota");
+
+  // Quando dá pra compartilhar o arquivo direto (a maioria dos celulares),
+  // isso já resolve o envio pelo WhatsApp com o PDF anexado sozinho — não
+  // faz sentido mostrar o botão de texto também. Quando não dá (a maioria
+  // dos navegadores de computador), mostramos o link de texto como reserva.
+  btnCompartilhar.classList.toggle("is-hidden", !podeCompartilhar);
+  btnWhats.classList.toggle("is-hidden", podeCompartilhar);
+  notaWhats.classList.add("is-hidden");
+
+  btnCompartilhar.onclick = () => {
+    const file = new File([blob], nomeArquivo, { type: "application/pdf" });
+    navigator.share({
+      files: [file],
+      title: "Treino",
+      text: `Olá ${aluno.nome}! Segue seu treino.`,
+    }).catch(() => {});
+  };
+
+  document.getElementById("btn-pdf-baixar").onclick = () => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = nomeArquivo;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
+  btnWhats.href = `${buildWhatsappLink(aluno.telefone)}?text=${encodeURIComponent(`Olá ${aluno.nome}! Segue seu treino.`)}`;
+  btnWhats.onclick = () => {
+    notaWhats.classList.remove("is-hidden");
+  };
+
+  document.getElementById("sheet-pdf-resultado").classList.remove("is-hidden");
+}
+
+document.getElementById("btn-pdf-fechar").addEventListener("click", () => {
+  document.getElementById("sheet-pdf-resultado").classList.add("is-hidden");
+});

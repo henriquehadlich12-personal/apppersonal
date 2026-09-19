@@ -5,9 +5,5 @@
 // segurança fica nas políticas de RLS já criadas no banco.
 // ============================================================
 
-const SUPABASE_URL = "https://hfjvpflfamtdcbcgtacf.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_2uUIkDFidpyLtVtPI268Mw_HKBNXQ1v";
-
-// OAuth Client ID do Google Cloud (tipo "Web application"), usado para
-// autorizar o upload do PDF do treino no Google Drive do personal.
-const GOOGLE_CLIENT_ID = "451567830435-k3u3s4qac26i9glsf78bpf9j62e1ap4f.apps.googleusercontent.com";
+const SUPABASE_URL = "COLE_AQUI_A_PROJECT_URL";
+const SUPABASE_ANON_KEY = "COLE_AQUI_A_ANON_KEY";
