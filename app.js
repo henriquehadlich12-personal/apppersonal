@@ -232,13 +232,14 @@ function abrirSheetNovo(horaStr) {
   document.getElementById("sheet-horario-titulo").textContent = "Novo horário";
   document.getElementById("sheet-horario-detalhe").classList.add("is-hidden");
   formHorario.classList.remove("is-hidden");
+  document.getElementById("btn-salvar-horario").textContent = "Salvar";
 
   formHorario.reset();
   selecionarTipo("personal");
   popularSelectAlunos(null);
   document.getElementById("input-inicio").value = horaStr;
   const [h, m] = horaStr.split(":").map(Number);
-  const fimMin = h * 60 + m + 60;
+  const fimMin = h * 60 + m + SLOT_MINUTOS;
   document.getElementById("input-fim").value = minutosParaHora(fimMin);
   document.getElementById("check-serie").checked = false;
   document.getElementById("campo-serie-semanas").classList.add("is-hidden");
@@ -268,6 +269,8 @@ function abrirSheetDetalhe(agendamento) {
     btnContatar.classList.add("is-hidden");
   }
 
+  document.getElementById("btn-editar-horario").onclick = () => abrirSheetParaEditar(agendamento);
+
   const excluirContainer = document.getElementById("detalhe-excluir-container");
   excluirContainer.innerHTML = "";
   if (agendamento.serie_id) {
@@ -292,6 +295,27 @@ function abrirSheetDetalhe(agendamento) {
   }
 
   sheetHorario.classList.remove("is-hidden");
+}
+
+// Edição altera sempre só esta ocorrência — mesmo se fizer parte de
+// uma série, não recria nem mexe nas outras datas. Por isso a opção
+// de "repetir semanalmente" fica escondida aqui, ela só faz sentido
+// na criação.
+function abrirSheetParaEditar(agendamento) {
+  editandoId = agendamento.id;
+  document.getElementById("sheet-horario-titulo").textContent = "Editar horário";
+  document.getElementById("sheet-horario-detalhe").classList.add("is-hidden");
+  formHorario.classList.remove("is-hidden");
+  document.getElementById("btn-salvar-horario").textContent = "Salvar alterações";
+
+  selecionarTipo(agendamento.tipo);
+  popularSelectAlunos(agendamento.aluno_id);
+  document.getElementById("input-inicio").value = horaCurta(agendamento.hora_inicio);
+  document.getElementById("input-fim").value = horaCurta(agendamento.hora_fim);
+  document.getElementById("input-obs").value = agendamento.observacoes || "";
+  document.getElementById("check-serie").checked = false;
+  document.getElementById("campo-serie-semanas").classList.add("is-hidden");
+  document.getElementById("campo-serie").classList.add("is-hidden");
 }
 
 document.getElementById("btn-fechar-detalhe").addEventListener("click", () => {
@@ -341,6 +365,27 @@ formHorario.addEventListener("submit", async (e) => {
 
   if (tipoSelecionado !== "bloqueio" && !alunoId) {
     toast("Selecione um aluno");
+    return;
+  }
+
+  if (editandoId) {
+    const linha = {
+      aluno_id: tipoSelecionado === "bloqueio" ? null : alunoId,
+      tipo: tipoSelecionado,
+      hora_inicio: inicio,
+      hora_fim: fim,
+      observacoes: obs,
+    };
+    const { error } = await sb.from("agendamentos").update(linha).eq("id", editandoId);
+    if (error) {
+      toast("Erro ao salvar alterações");
+      console.error(error);
+      return;
+    }
+    toast("Horário atualizado");
+    editandoId = null;
+    sheetHorario.classList.add("is-hidden");
+    carregarAgendaDoDia();
     return;
   }
 

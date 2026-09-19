@@ -235,6 +235,14 @@ function renderTreinoDraftList() {
     const row = document.createElement("div");
     row.className = "draft-item";
     row.innerHTML = `
+      <div class="draft-item-reorder">
+        <button type="button" class="reorder-btn" data-dir="up" aria-label="Mover para cima" ${index === 0 ? "disabled" : ""}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+        </button>
+        <button type="button" class="reorder-btn" data-dir="down" aria-label="Mover para baixo" ${index === treinoDraftItems.length - 1 ? "disabled" : ""}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+        </button>
+      </div>
       <div class="equip-icon equip-icon-sm">${visualEquipamentoHtml(equip)}</div>
       <div class="draft-item-info">
         <div class="draft-item-nome">${equip.nome}</div>
@@ -247,7 +255,15 @@ function renderTreinoDraftList() {
       <button type="button" class="icon-action icon-action-danger" aria-label="Remover">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>`;
-    row.querySelector("button").addEventListener("click", () => {
+    row.querySelectorAll(".reorder-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const alvo = btn.dataset.dir === "up" ? index - 1 : index + 1;
+        if (alvo < 0 || alvo >= treinoDraftItems.length) return;
+        [treinoDraftItems[index], treinoDraftItems[alvo]] = [treinoDraftItems[alvo], treinoDraftItems[index]];
+        renderTreinoDraftList();
+      });
+    });
+    row.querySelector(".icon-action-danger").addEventListener("click", () => {
       treinoDraftItems.splice(index, 1);
       renderTreinoDraftList();
     });
