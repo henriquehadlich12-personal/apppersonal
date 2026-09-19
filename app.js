@@ -4,8 +4,18 @@
 
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-const START_HOUR = 6;   // primeira linha do dia
-const END_HOUR = 20;    // última linha começa às 20:00 (termina 21:00)
+const START_HOUR = 6;   // primeira hora do dia
+const END_HOUR = 20;    // última hora do dia (expediente vai até END_HOUR + 1)
+const SLOT_MINUTOS = 30; // granularidade da agenda — marca de 30 em 30 min
+
+const INICIO_MIN = START_HOUR * 60;
+const FIM_MIN = (END_HOUR + 1) * 60;
+
+function minutosParaHora(min) {
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return String(h).padStart(2, "0") + ":" + String(m).padStart(2, "0");
+}
 
 let currentDate = new Date();
 let alunosCache = [];
@@ -126,10 +136,9 @@ function renderAgendaList() {
   const container = document.getElementById("agenda-list");
   container.innerHTML = "";
 
-  for (let hour = START_HOUR; hour <= END_HOUR; hour++) {
-    const horaStr = String(hour).padStart(2, "0") + ":00";
-    const slotStart = hour * 60;
-    const slotEnd = slotStart + 60;
+  for (let slotStart = INICIO_MIN; slotStart < FIM_MIN; slotStart += SLOT_MINUTOS) {
+    const horaStr = minutosParaHora(slotStart);
+    const slotEnd = slotStart + SLOT_MINUTOS;
 
     // Um agendamento "ocupa" esta linha se o intervalo dele cruza
     // com o intervalo da hora, não só se começa exatamente aqui.
@@ -228,8 +237,9 @@ function abrirSheetNovo(horaStr) {
   selecionarTipo("personal");
   popularSelectAlunos(null);
   document.getElementById("input-inicio").value = horaStr;
-  const [h] = horaStr.split(":").map(Number);
-  document.getElementById("input-fim").value = String(h + 1).padStart(2, "0") + ":00";
+  const [h, m] = horaStr.split(":").map(Number);
+  const fimMin = h * 60 + m + 60;
+  document.getElementById("input-fim").value = minutosParaHora(fimMin);
   document.getElementById("check-serie").checked = false;
   document.getElementById("campo-serie-semanas").classList.add("is-hidden");
 
