@@ -593,8 +593,21 @@ function renderAniversariantesHoje() {
     return;
   }
 
-  const nomes = aniversariantes.map((a) => a.nome).join(", ");
-  banner.innerHTML = `🎂 <strong>Aniversário hoje:</strong> ${nomes}`;
+  banner.innerHTML = aniversariantes.map((a) => `
+    <div class="aniversario-item">
+      <span>🎂 <strong>${a.nome}</strong> faz aniversário hoje!</span>
+      <a class="aniversario-btn" data-id="${a.id}" href="#">Desejar parabéns</a>
+    </div>
+  `).join("");
+
+  aniversariantes.forEach((a) => {
+    const btn = banner.querySelector(`[data-id="${a.id}"]`);
+    const texto = encodeURIComponent(`Parabéns, ${a.nome}! 🎉 Desejo a você um dia repleto de alegrias. Conte comigo sempre!`);
+    btn.href = `${buildWhatsappLink(a.telefone)}?text=${texto}`;
+    btn.target = "_blank";
+    btn.rel = "noopener";
+  });
+
   banner.classList.remove("is-hidden");
 }
 

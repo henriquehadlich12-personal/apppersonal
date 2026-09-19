@@ -184,7 +184,26 @@ button, input, select {
   border-radius: 12px;
   padding: 10px 14px;
   font-size: 13px;
-  text-align: center;
+}
+
+.aniversario-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.aniversario-btn {
+  flex-shrink: 0;
+  background: var(--cor-avaliacao);
+  color: #1E1430;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  padding: 6px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 
 /* ---------------- Legend ---------------- */
