@@ -449,12 +449,19 @@ button, input, select {
 
 .field-input {
   width: 100%;
+  height: 44px;
   background: var(--surface-raised);
   border: 1px solid var(--border);
   color: var(--text);
   padding: 11px 12px;
   border-radius: 10px;
   font-size: 15px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+select.field-input {
+  height: 44px;
 }
 
 textarea.field-input {

@@ -202,6 +202,7 @@ function abrirSheetItemTreino(equip) {
   document.getElementById("sheet-item-titulo").textContent = equip.nome;
   document.getElementById("form-item-treino").reset();
   document.getElementById("input-item-series").value = 3;
+  document.getElementById("input-item-reps").value = "10-12-15";
   document.getElementById("sheet-item-treino").classList.remove("is-hidden");
 }
 
