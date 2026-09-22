@@ -663,6 +663,15 @@ textarea.field-input {
   padding-bottom: 4px;
 }
 
+.equip-busca-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+.equip-busca-row .field-input { flex: 1; }
+.equip-busca-row .icon-action { flex-shrink: 0; width: 44px; height: 44px; }
+
 .chip {
   flex-shrink: 0;
   border: 1px solid var(--border);

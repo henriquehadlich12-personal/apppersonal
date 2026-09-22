@@ -5,7 +5,7 @@
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const START_HOUR = 6;   // primeira hora do dia
-const END_HOUR = 20;    // última hora do dia (expediente vai até END_HOUR + 1)
+const END_HOUR = 22;    // última hora do dia (expediente vai até END_HOUR + 1, ou seja 23h)
 const SLOT_MINUTOS = 30; // granularidade da agenda — marca de 30 em 30 min
 
 const INICIO_MIN = START_HOUR * 60;

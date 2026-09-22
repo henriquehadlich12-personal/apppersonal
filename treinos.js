@@ -9,9 +9,11 @@ let alunoTreinoSelecionadoId = null;
 let categoriaAtiva = "Todos";
 let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes, video_url }
 let equipamentoEmEdicao = null;
-let equipamentoFotosCache = {}; // { equipamento_id: foto_url }
+let equipamentoFotosCache = {}; // { equipamento_id: foto_url } — override de foto pros equipamentos do catálogo fixo
 let equipamentoUploadAtual = null;
 let treinoEmEdicaoId = null;
+let equipamentosCustomizadosCache = []; // equipamentos criados pelo próprio personal
+let termoBuscaEquip = "";
 
 function calcularIdade(dataNascimento) {
   if (!dataNascimento) return null;
@@ -34,10 +36,38 @@ async function carregarFotosEquipamento() {
   equipamentoFotosCache = Object.fromEntries(data.map((f) => [f.equipamento_id, f.foto_url]));
 }
 
+async function carregarEquipamentosCustomizados() {
+  const { data, error } = await sb.from("equipamentos_customizados").select("*").order("nome");
+  if (error) {
+    console.error(error);
+    return;
+  }
+  equipamentosCustomizadosCache = data;
+}
+
+// Junta o catálogo fixo (com croqui) com os equipamentos que o próprio
+// personal cadastrou (sempre com foto). equipamentoPorId (em
+// equipamentos.js) só conhece o catálogo fixo, então esta função
+// procura nos dois lugares.
+function equipamentoPorIdGeral(id) {
+  return equipamentoPorId(id) || equipamentosCustomizadosCache.find((e) => e.id === id);
+}
+
+function todosEquipamentos() {
+  return [...EQUIPAMENTOS, ...equipamentosCustomizadosCache];
+}
+
+function todasCategorias() {
+  return [...new Set(todosEquipamentos().map((e) => e.categoria))];
+}
+
 function inicializarTreinos() {
   popularSelectAlunoTreino();
+  Promise.all([carregarFotosEquipamento(), carregarEquipamentosCustomizados()]).then(() => {
+    renderChipsCategoria();
+    renderEquipGrid();
+  });
   renderChipsCategoria();
-  carregarFotosEquipamento().then(renderEquipGrid);
   renderEquipGrid();
   if (!treinosInicializado) {
     document.getElementById("select-aluno-treino").addEventListener("change", (e) => {
@@ -53,6 +83,15 @@ function inicializarTreinos() {
     document.getElementById("input-foto-equipamento").addEventListener("change", handleFotoEquipamentoSelecionada);
     document.getElementById("btn-excluir-todos-treinos").addEventListener("click", excluirTodosTreinos);
     document.getElementById("btn-cancelar-edicao-treino").addEventListener("click", cancelarEdicaoTreino);
+    document.getElementById("input-busca-equip").addEventListener("input", (e) => {
+      termoBuscaEquip = e.target.value;
+      renderEquipGrid();
+    });
+    document.getElementById("btn-novo-equipamento").addEventListener("click", abrirSheetNovoEquipamento);
+    document.getElementById("btn-cancelar-novo-equipamento").addEventListener("click", () => {
+      document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
+    });
+    document.getElementById("form-novo-equipamento").addEventListener("submit", salvarNovoEquipamento);
     treinosInicializado = true;
   }
   atualizarConteudoTreino();
@@ -106,7 +145,7 @@ function renderAlunoHeaderCard() {
 function renderChipsCategoria() {
   const container = document.getElementById("equip-categorias");
   container.innerHTML = "";
-  ["Todos", ...CATEGORIAS_EQUIPAMENTO].forEach((cat) => {
+  ["Todos", ...todasCategorias()].forEach((cat) => {
     const chip = document.createElement("button");
     chip.type = "button";
     chip.className = "chip" + (cat === categoriaAtiva ? " is-active" : "");
@@ -121,7 +160,7 @@ function renderChipsCategoria() {
 }
 
 function visualEquipamentoHtml(equip) {
-  const foto = equipamentoFotosCache[equip.id];
+  const foto = (equip && equip.foto_url) || equipamentoFotosCache[equip.id];
   return foto
     ? `<img src="${foto}" class="equip-visual" alt="${equip.nome}" />`
     : equip.svg;
@@ -130,9 +169,19 @@ function visualEquipamentoHtml(equip) {
 function renderEquipGrid() {
   const grid = document.getElementById("equip-grid");
   grid.innerHTML = "";
-  const lista = categoriaAtiva === "Todos"
-    ? EQUIPAMENTOS
-    : EQUIPAMENTOS.filter((e) => e.categoria === categoriaAtiva);
+  let lista = categoriaAtiva === "Todos"
+    ? todosEquipamentos()
+    : todosEquipamentos().filter((e) => e.categoria === categoriaAtiva);
+
+  if (termoBuscaEquip.trim()) {
+    const termo = termoBuscaEquip.trim().toLowerCase();
+    lista = lista.filter((e) => e.nome.toLowerCase().includes(termo));
+  }
+
+  if (lista.length === 0) {
+    grid.innerHTML = `<p class="empty-hint" style="grid-column: 1 / -1;">Nenhum equipamento encontrado.</p>`;
+    return;
+  }
 
   lista.forEach((equip) => {
     const card = document.createElement("button");
@@ -161,7 +210,11 @@ async function handleFotoEquipamentoSelecionada(e) {
 
   toast("Enviando foto...");
   const extensao = file.name.split(".").pop().toLowerCase();
-  const caminho = `${equipamentoUploadAtual.id}.${extensao}`;
+  const ehCustomizado = !equipamentoUploadAtual.svg; // equipamento próprio não tem croqui
+
+  const caminho = ehCustomizado
+    ? `custom-${equipamentoUploadAtual.id}.${extensao}`
+    : `${equipamentoUploadAtual.id}.${extensao}`;
 
   const { error: erroUpload } = await sb.storage
     .from("equipamentos")
@@ -178,18 +231,85 @@ async function handleFotoEquipamentoSelecionada(e) {
   // depois de trocar a imagem do mesmo equipamento.
   const fotoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
 
-  const { error: erroSalvar } = await sb
-    .from("equipamento_fotos")
-    .upsert({ equipamento_id: equipamentoUploadAtual.id, foto_url: fotoUrl });
+  if (ehCustomizado) {
+    const { error: erroSalvar } = await sb
+      .from("equipamentos_customizados")
+      .update({ foto_url: fotoUrl })
+      .eq("id", equipamentoUploadAtual.id);
+    if (erroSalvar) {
+      toast("Erro ao salvar foto");
+      console.error(erroSalvar);
+      return;
+    }
+    equipamentoUploadAtual.foto_url = fotoUrl;
+  } else {
+    const { error: erroSalvar } = await sb
+      .from("equipamento_fotos")
+      .upsert({ equipamento_id: equipamentoUploadAtual.id, foto_url: fotoUrl });
+    if (erroSalvar) {
+      toast("Erro ao salvar referência da foto");
+      console.error(erroSalvar);
+      return;
+    }
+    equipamentoFotosCache[equipamentoUploadAtual.id] = fotoUrl;
+  }
 
-  if (erroSalvar) {
-    toast("Erro ao salvar referência da foto");
-    console.error(erroSalvar);
+  toast("Foto atualizada");
+  renderEquipGrid();
+}
+
+// ------------------------------------------------------------
+// Cadastro de equipamento próprio (nome, categoria e foto)
+// ------------------------------------------------------------
+
+function abrirSheetNovoEquipamento() {
+  document.getElementById("form-novo-equipamento").reset();
+  const datalist = document.getElementById("lista-categorias-equip");
+  datalist.innerHTML = todasCategorias().map((c) => `<option value="${c}"></option>`).join("");
+  document.getElementById("sheet-novo-equipamento").classList.remove("is-hidden");
+}
+
+async function salvarNovoEquipamento(e) {
+  e.preventDefault();
+  const nome = document.getElementById("input-equip-nome").value.trim();
+  const categoria = document.getElementById("input-equip-categoria").value.trim();
+  const file = document.getElementById("input-equip-foto").files[0];
+
+  if (!nome || !categoria || !file) {
+    toast("Preencha nome, categoria e foto");
     return;
   }
 
-  equipamentoFotosCache[equipamentoUploadAtual.id] = fotoUrl;
-  toast("Foto atualizada");
+  toast("Salvando equipamento...");
+  const novoId = crypto.randomUUID();
+  const extensao = file.name.split(".").pop().toLowerCase();
+  const caminho = `custom-${novoId}.${extensao}`;
+
+  const { error: erroUpload } = await sb.storage
+    .from("equipamentos")
+    .upload(caminho, file, { upsert: true, contentType: file.type });
+  if (erroUpload) {
+    toast("Erro ao enviar a foto");
+    console.error(erroUpload);
+    return;
+  }
+
+  const { data: urlData } = sb.storage.from("equipamentos").getPublicUrl(caminho);
+  const fotoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
+
+  const { error: erroInsert } = await sb
+    .from("equipamentos_customizados")
+    .insert([{ id: novoId, nome, categoria, foto_url: fotoUrl }]);
+  if (erroInsert) {
+    toast("Erro ao salvar equipamento");
+    console.error(erroInsert);
+    return;
+  }
+
+  toast("Equipamento adicionado");
+  document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
+  await carregarEquipamentosCustomizados();
+  renderChipsCategoria();
   renderEquipGrid();
 }
 
@@ -202,7 +322,7 @@ function abrirSheetItemTreino(equip) {
   document.getElementById("sheet-item-titulo").textContent = equip.nome;
   document.getElementById("form-item-treino").reset();
   document.getElementById("input-item-series").value = 3;
-  document.getElementById("input-item-reps").value = "10-12-15";
+  document.getElementById("input-item-reps").value = "15-12-10";
   document.getElementById("sheet-item-treino").classList.remove("is-hidden");
 }
 
@@ -232,7 +352,7 @@ function renderTreinoDraftList() {
   vazio.classList.add("is-hidden");
 
   treinoDraftItems.forEach((item, index) => {
-    const equip = equipamentoPorId(item.equipamento_id);
+    const equip = equipamentoPorIdGeral(item.equipamento_id);
     const row = document.createElement("div");
     row.className = "draft-item";
     row.innerHTML = `
@@ -540,7 +660,7 @@ function svgComNamespaceEtamanho(svgString, largura, altura) {
 
 async function iconeOuFotoParaPng(equip, tamanho) {
   if (!equip) return null;
-  const fotoUrl = equipamentoFotosCache[equip.id];
+  const fotoUrl = equip.foto_url || equipamentoFotosCache[equip.id];
   if (fotoUrl) {
     try {
       return await carregarImagemQuadrada(fotoUrl, tamanho, true);
@@ -548,6 +668,7 @@ async function iconeOuFotoParaPng(equip, tamanho) {
       console.warn(`Falha ao carregar foto de "${equip.nome}" (${fotoUrl}) — usando croqui`, e);
     }
   }
+  if (!equip.svg) return null; // equipamento próprio sem foto disponível — segue sem ícone
   try {
     return await carregarImagemQuadrada(svgComNamespaceEtamanho(equip.svg, 48, 48), tamanho);
   } catch (e) {
@@ -561,7 +682,7 @@ async function precarregarIconesPdf(itens) {
   const pares = await Promise.all(
     idsUnicos.map(async (id) => {
       try {
-        return [id, await iconeOuFotoParaPng(equipamentoPorId(id), 220)];
+        return [id, await iconeOuFotoParaPng(equipamentoPorIdGeral(id), 220)];
       } catch (e) {
         console.warn(`Falha total ao preparar imagem do equipamento ${id}`, e);
         return [id, null];
@@ -704,7 +825,7 @@ async function gerarPdfTreino(treino) {
   const larguraTexto = larguraPagina - margem - (margem + iconeTamanho + 22) - 14;
 
   itensOrdenados.forEach((item, index) => {
-    const equip = equipamentoPorId(item.equipamento_id);
+    const equip = equipamentoPorIdGeral(item.equipamento_id);
     const temVideo = !!item.video_url;
     const textoX = margem + iconeTamanho + 22;
 

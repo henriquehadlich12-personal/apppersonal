@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12141A" />
-<link rel="stylesheet" href="style.css?v=6" />
+<link rel="stylesheet" href="style.css?v=7" />
 </head>
 <body>
 
@@ -88,6 +88,12 @@
       <div id="aluno-header-card" class="aluno-header-card"></div>
 
       <h3 class="subsection-title">Adicionar equipamento</h3>
+      <div class="equip-busca-row">
+        <input type="text" id="input-busca-equip" class="field-input" placeholder="Buscar equipamento..." />
+        <button type="button" id="btn-novo-equipamento" class="icon-action" aria-label="Novo equipamento">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
       <div id="equip-categorias" class="chip-row"></div>
       <div id="equip-grid" class="equip-grid"></div>
 
@@ -286,6 +292,33 @@
     </div>
   </div>
 
+  <!-- ==================== SHEET: NOVO EQUIPAMENTO ==================== -->
+  <div id="sheet-novo-equipamento" class="sheet-overlay is-hidden">
+    <div class="sheet">
+      <div class="sheet-handle"></div>
+      <h2>Novo equipamento</h2>
+      <form id="form-novo-equipamento">
+        <div class="field">
+          <label class="field-label" for="input-equip-nome">Nome do equipamento</label>
+          <input type="text" id="input-equip-nome" class="field-input" placeholder="Ex: Cross Over" required />
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-equip-categoria">Categoria</label>
+          <input type="text" id="input-equip-categoria" class="field-input" list="lista-categorias-equip" placeholder="Ex: Peito" required />
+          <datalist id="lista-categorias-equip"></datalist>
+        </div>
+        <div class="field">
+          <label class="field-label" for="input-equip-foto">Foto (escolher dos arquivos)</label>
+          <input type="file" id="input-equip-foto" class="field-input" accept="image/*" required />
+        </div>
+        <div class="sheet-actions">
+          <button type="submit" class="primary-btn">Salvar equipamento</button>
+          <button type="button" id="btn-cancelar-novo-equipamento" class="secondary-btn">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <input type="file" id="input-foto-equipamento" accept="image/*" class="is-hidden" />
 
   <!-- ==================== SHEET: RESULTADO DO PDF (compartilhar/baixar) ==================== -->
@@ -310,10 +343,10 @@
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
-  <script src="logo.js?v=6"></script>
-  <script src="equipamentos.js?v=6"></script>
-  <script src="app.js?v=6"></script>
-  <script src="avaliacao.js?v=6"></script>
-  <script src="treinos.js?v=6"></script>
+  <script src="logo.js?v=7"></script>
+  <script src="equipamentos.js?v=7"></script>
+  <script src="app.js?v=7"></script>
+  <script src="avaliacao.js?v=7"></script>
+  <script src="treinos.js?v=7"></script>
 </body>
 </html>
