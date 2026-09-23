@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12141A" />
-<link rel="stylesheet" href="style.css?v=7" />
+<link rel="stylesheet" href="style.css?v=8" />
 </head>
 <body>
 
@@ -303,9 +303,12 @@
           <input type="text" id="input-equip-nome" class="field-input" placeholder="Ex: Cross Over" required />
         </div>
         <div class="field">
-          <label class="field-label" for="input-equip-categoria">Categoria</label>
-          <input type="text" id="input-equip-categoria" class="field-input" list="lista-categorias-equip" placeholder="Ex: Peito" required />
-          <datalist id="lista-categorias-equip"></datalist>
+          <label class="field-label" for="select-equip-categoria">Categoria</label>
+          <select id="select-equip-categoria" class="field-input"></select>
+        </div>
+        <div class="field is-hidden" id="campo-nova-categoria">
+          <label class="field-label" for="input-equip-categoria-nova">Nome da nova categoria</label>
+          <input type="text" id="input-equip-categoria-nova" class="field-input" placeholder="Ex: Funcional" />
         </div>
         <div class="field">
           <label class="field-label" for="input-equip-foto">Foto (escolher dos arquivos)</label>
@@ -343,10 +346,10 @@
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
-  <script src="logo.js?v=7"></script>
-  <script src="equipamentos.js?v=7"></script>
-  <script src="app.js?v=7"></script>
-  <script src="avaliacao.js?v=7"></script>
-  <script src="treinos.js?v=7"></script>
+  <script src="logo.js?v=8"></script>
+  <script src="equipamentos.js?v=8"></script>
+  <script src="app.js?v=8"></script>
+  <script src="avaliacao.js?v=8"></script>
+  <script src="treinos.js?v=8"></script>
 </body>
 </html>

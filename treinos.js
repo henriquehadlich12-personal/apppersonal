@@ -264,15 +264,29 @@ async function handleFotoEquipamentoSelecionada(e) {
 
 function abrirSheetNovoEquipamento() {
   document.getElementById("form-novo-equipamento").reset();
-  const datalist = document.getElementById("lista-categorias-equip");
-  datalist.innerHTML = todasCategorias().map((c) => `<option value="${c}"></option>`).join("");
+
+  const select = document.getElementById("select-equip-categoria");
+  select.innerHTML = todasCategorias().map((c) => `<option value="${c}">${c}</option>`).join("")
+    + `<option value="__nova__">+ Nova categoria...</option>`;
+  document.getElementById("campo-nova-categoria").classList.add("is-hidden");
+
   document.getElementById("sheet-novo-equipamento").classList.remove("is-hidden");
 }
+
+document.getElementById("select-equip-categoria").addEventListener("change", (e) => {
+  const campoNova = document.getElementById("campo-nova-categoria");
+  const ehNova = e.target.value === "__nova__";
+  campoNova.classList.toggle("is-hidden", !ehNova);
+  if (ehNova) document.getElementById("input-equip-categoria-nova").focus();
+});
 
 async function salvarNovoEquipamento(e) {
   e.preventDefault();
   const nome = document.getElementById("input-equip-nome").value.trim();
-  const categoria = document.getElementById("input-equip-categoria").value.trim();
+  const selecaoCategoria = document.getElementById("select-equip-categoria").value;
+  const categoria = selecaoCategoria === "__nova__"
+    ? document.getElementById("input-equip-categoria-nova").value.trim()
+    : selecaoCategoria;
   const file = document.getElementById("input-equip-foto").files[0];
 
   if (!nome || !categoria || !file) {
