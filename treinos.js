@@ -9,8 +9,7 @@ let alunoTreinoSelecionadoId = null;
 let categoriaAtiva = "Todos";
 let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes, video_url }
 let equipamentoEmEdicao = null;
-let equipamentoFotosCache = {}; // { equipamento_id: foto_url } — override de foto pros equipamentos do catálogo fixo
-let equipamentoUploadAtual = null;
+let equipamentoOverridesCache = {}; // { equipamento_id: {foto_url, nome, categoria, oculto} } — sobreposição pro catálogo fixo
 let treinoEmEdicaoId = null;
 let equipamentosCustomizadosCache = []; // equipamentos criados pelo próprio personal
 let termoBuscaEquip = "";
@@ -33,7 +32,7 @@ async function carregarFotosEquipamento() {
     console.error(error);
     return;
   }
-  equipamentoFotosCache = Object.fromEntries(data.map((f) => [f.equipamento_id, f.foto_url]));
+  equipamentoOverridesCache = Object.fromEntries(data.map((f) => [f.equipamento_id, f]));
 }
 
 async function carregarEquipamentosCustomizados() {
@@ -45,20 +44,44 @@ async function carregarEquipamentosCustomizados() {
   equipamentosCustomizadosCache = data;
 }
 
-// Junta o catálogo fixo (com croqui) com os equipamentos que o próprio
-// personal cadastrou (sempre com foto). equipamentoPorId (em
-// equipamentos.js) só conhece o catálogo fixo, então esta função
-// procura nos dois lugares.
-function equipamentoPorIdGeral(id) {
-  return equipamentoPorId(id) || equipamentosCustomizadosCache.find((e) => e.id === id);
+// Aplica a sobreposição (nome/categoria/foto/oculto) de cada item do
+// catálogo fixo, se existir uma salva no banco.
+function catalogoComOverrides() {
+  return EQUIPAMENTOS.map((e) => {
+    const ov = equipamentoOverridesCache[e.id];
+    if (!ov) return e;
+    return {
+      ...e,
+      nome: ov.nome || e.nome,
+      categoria: ov.categoria || e.categoria,
+      foto_url: ov.foto_url || null,
+      _oculto: !!ov.oculto,
+    };
+  });
 }
 
-function todosEquipamentos() {
-  return [...EQUIPAMENTOS, ...equipamentosCustomizadosCache];
+// Junta o catálogo fixo (já com as sobreposições aplicadas) com os
+// equipamentos que o próprio personal cadastrou. Usado para localizar
+// um equipamento por id em qualquer lugar (treino salvo, PDF, etc),
+// mesmo que ele esteja oculto do seletor.
+function equipamentoPorIdGeral(id) {
+  return catalogoComOverrides().find((e) => e.id === id) ||
+    equipamentosCustomizadosCache.find((e) => e.id === id);
+}
+
+// Lista para exibir no seletor: catálogo fixo (sem os ocultados) + os
+// equipamentos próprios.
+function todosEquipamentosVisiveis() {
+  const catalogo = catalogoComOverrides().filter((e) => !e._oculto);
+  return [...catalogo, ...equipamentosCustomizadosCache];
 }
 
 function todasCategorias() {
-  return [...new Set(todosEquipamentos().map((e) => e.categoria))];
+  return [...new Set(todosEquipamentosVisiveis().map((e) => e.categoria))];
+}
+
+function equipamentoEhProprio(id) {
+  return equipamentosCustomizadosCache.some((e) => e.id === id);
 }
 
 function inicializarTreinos() {
@@ -80,7 +103,6 @@ function inicializarTreinos() {
       document.getElementById("sheet-item-treino").classList.add("is-hidden");
     });
     document.getElementById("form-item-treino").addEventListener("submit", confirmarItemTreino);
-    document.getElementById("input-foto-equipamento").addEventListener("change", handleFotoEquipamentoSelecionada);
     document.getElementById("btn-excluir-todos-treinos").addEventListener("click", excluirTodosTreinos);
     document.getElementById("btn-cancelar-edicao-treino").addEventListener("click", cancelarEdicaoTreino);
     document.getElementById("input-busca-equip").addEventListener("input", (e) => {
@@ -160,9 +182,8 @@ function renderChipsCategoria() {
 }
 
 function visualEquipamentoHtml(equip) {
-  const foto = (equip && equip.foto_url) || equipamentoFotosCache[equip.id];
-  return foto
-    ? `<img src="${foto}" class="equip-visual" alt="${equip.nome}" />`
+  return equip.foto_url
+    ? `<img src="${equip.foto_url}" class="equip-visual" alt="${equip.nome}" />`
     : equip.svg;
 }
 
@@ -170,8 +191,8 @@ function renderEquipGrid() {
   const grid = document.getElementById("equip-grid");
   grid.innerHTML = "";
   let lista = categoriaAtiva === "Todos"
-    ? todosEquipamentos()
-    : todosEquipamentos().filter((e) => e.categoria === categoriaAtiva);
+    ? todosEquipamentosVisiveis()
+    : todosEquipamentosVisiveis().filter((e) => e.categoria === categoriaAtiva);
 
   if (termoBuscaEquip.trim()) {
     const termo = termoBuscaEquip.trim().toLowerCase();
@@ -184,95 +205,32 @@ function renderEquipGrid() {
   }
 
   lista.forEach((equip) => {
-    const ehCustomizado = !equip.svg;
     const card = document.createElement("button");
     card.type = "button";
     card.className = "equip-card";
     card.innerHTML = `
-      <button type="button" class="equip-card-photo-btn" aria-label="${ehCustomizado ? "Editar equipamento" : "Adicionar foto real"}">
-        ${ehCustomizado
-          ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
-          : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>'}
+      <button type="button" class="equip-card-photo-btn" aria-label="Editar equipamento">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
       </button>
       <div class="equip-icon">${visualEquipamentoHtml(equip)}</div>
       <div class="equip-nome">${equip.nome}</div>`;
     card.addEventListener("click", () => abrirSheetItemTreino(equip));
     card.querySelector(".equip-card-photo-btn").addEventListener("click", (e) => {
       e.stopPropagation();
-      if (ehCustomizado) {
-        abrirSheetEditarEquipamento(equip);
-      } else {
-        equipamentoUploadAtual = equip;
-        document.getElementById("input-foto-equipamento").click();
-      }
+      abrirSheetEditarEquipamento(equip);
     });
     grid.appendChild(card);
   });
 }
 
-async function handleFotoEquipamentoSelecionada(e) {
-  const file = e.target.files[0];
-  e.target.value = ""; // permite escolher o mesmo arquivo de novo depois
-  if (!file || !equipamentoUploadAtual) return;
-
-  toast("Enviando foto...");
-  const extensao = file.name.split(".").pop().toLowerCase();
-  const ehCustomizado = !equipamentoUploadAtual.svg; // equipamento próprio não tem croqui
-
-  const caminho = ehCustomizado
-    ? `custom-${equipamentoUploadAtual.id}.${extensao}`
-    : `${equipamentoUploadAtual.id}.${extensao}`;
-
-  const { error: erroUpload } = await sb.storage
-    .from("equipamentos")
-    .upload(caminho, file, { upsert: true, contentType: file.type });
-
-  if (erroUpload) {
-    toast("Erro ao enviar foto — veja o README (bucket do Storage)");
-    console.error(erroUpload);
-    return;
-  }
-
-  const { data: urlData } = sb.storage.from("equipamentos").getPublicUrl(caminho);
-  // Timestamp no final evita que o navegador mostre a foto antiga em cache
-  // depois de trocar a imagem do mesmo equipamento.
-  const fotoUrl = `${urlData.publicUrl}?v=${Date.now()}`;
-
-  if (ehCustomizado) {
-    const { error: erroSalvar } = await sb
-      .from("equipamentos_customizados")
-      .update({ foto_url: fotoUrl })
-      .eq("id", equipamentoUploadAtual.id);
-    if (erroSalvar) {
-      toast("Erro ao salvar foto");
-      console.error(erroSalvar);
-      return;
-    }
-    equipamentoUploadAtual.foto_url = fotoUrl;
-  } else {
-    const { error: erroSalvar } = await sb
-      .from("equipamento_fotos")
-      .upsert({ equipamento_id: equipamentoUploadAtual.id, foto_url: fotoUrl });
-    if (erroSalvar) {
-      toast("Erro ao salvar referência da foto");
-      console.error(erroSalvar);
-      return;
-    }
-    equipamentoFotosCache[equipamentoUploadAtual.id] = fotoUrl;
-  }
-
-  toast("Foto atualizada");
-  renderEquipGrid();
-}
-
 // ------------------------------------------------------------
-// Cadastro de equipamento próprio (nome, categoria e foto)
+// Cadastro / edição de equipamento (catálogo padrão OU próprio)
 // ------------------------------------------------------------
 
-let equipamentoCustomEmEdicaoId = null;
+let equipamentoEmEdicaoId = null; // id do equipamento aberto na sheet (de qualquer origem)
 
 function abrirSheetNovoEquipamento() {
-  equipamentoCustomEmEdicaoId = null;
+  equipamentoEmEdicaoId = null;
   document.getElementById("form-novo-equipamento").reset();
   document.getElementById("titulo-sheet-equipamento").textContent = "Novo equipamento";
   document.getElementById("label-equip-foto").textContent = "Foto (escolher dos arquivos)";
@@ -287,11 +245,14 @@ function abrirSheetNovoEquipamento() {
 }
 
 function abrirSheetEditarEquipamento(equip) {
-  equipamentoCustomEmEdicaoId = equip.id;
+  equipamentoEmEdicaoId = equip.id;
   document.getElementById("form-novo-equipamento").reset();
   document.getElementById("titulo-sheet-equipamento").textContent = "Editar equipamento";
   document.getElementById("label-equip-foto").textContent = "Trocar foto (opcional)";
   document.getElementById("area-excluir-equipamento").classList.remove("is-hidden");
+  document.getElementById("btn-excluir-equipamento").textContent = equipamentoEhProprio(equip.id)
+    ? "Excluir equipamento"
+    : "Ocultar equipamento";
 
   const select = document.getElementById("select-equip-categoria");
   const categorias = todasCategorias();
@@ -313,18 +274,36 @@ document.getElementById("select-equip-categoria").addEventListener("change", (e)
 });
 
 document.getElementById("btn-excluir-equipamento").addEventListener("click", async () => {
-  if (!equipamentoCustomEmEdicaoId) return;
-  if (!confirm("Excluir este equipamento? Treinos já salvos que o usam vão mostrar apenas o nome, sem ícone.")) return;
+  if (!equipamentoEmEdicaoId) return;
+  const ehProprio = equipamentoEhProprio(equipamentoEmEdicaoId);
 
-  const { error } = await sb.from("equipamentos_customizados").delete().eq("id", equipamentoCustomEmEdicaoId);
-  if (error) {
-    toast("Erro ao excluir equipamento");
-    console.error(error);
-    return;
+  const confirmMsg = ehProprio
+    ? "Excluir este equipamento? Treinos já salvos que o usam vão mostrar apenas o nome, sem ícone."
+    : "Ocultar este equipamento da lista? Ele é padrão do app e não pode ser apagado de vez, mas deixa de aparecer pra você escolher (treinos já salvos continuam mostrando ele normalmente).";
+  if (!confirm(confirmMsg)) return;
+
+  if (ehProprio) {
+    const { error } = await sb.from("equipamentos_customizados").delete().eq("id", equipamentoEmEdicaoId);
+    if (error) {
+      toast("Erro ao excluir equipamento");
+      console.error(error);
+      return;
+    }
+    toast("Equipamento excluído");
+  } else {
+    const { error } = await sb
+      .from("equipamento_fotos")
+      .upsert({ equipamento_id: equipamentoEmEdicaoId, oculto: true });
+    if (error) {
+      toast("Erro ao ocultar equipamento");
+      console.error(error);
+      return;
+    }
+    toast("Equipamento ocultado");
   }
-  toast("Equipamento excluído");
+
   document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
-  await carregarEquipamentosCustomizados();
+  await Promise.all([carregarFotosEquipamento(), carregarEquipamentosCustomizados()]);
   renderChipsCategoria();
   renderEquipGrid();
 });
@@ -342,19 +321,53 @@ async function salvarNovoEquipamento(e) {
     toast("Preencha nome e categoria");
     return;
   }
-  if (!equipamentoCustomEmEdicaoId && !file) {
+  if (!equipamentoEmEdicaoId && !file) {
     toast("Escolha uma foto para o novo equipamento");
     return;
   }
 
   toast("Salvando equipamento...");
 
-  // Modo edição: atualiza nome/categoria, e a foto só se uma nova foi escolhida
-  if (equipamentoCustomEmEdicaoId) {
+  // Editando um equipamento do CATÁLOGO PADRÃO (não tem registro próprio —
+  // salva/atualiza a sobreposição na tabela equipamento_fotos)
+  if (equipamentoEmEdicaoId && !equipamentoEhProprio(equipamentoEmEdicaoId)) {
+    const payload = { equipamento_id: equipamentoEmEdicaoId, nome, categoria };
+    if (file) {
+      const extensao = file.name.split(".").pop().toLowerCase();
+      const caminho = `${equipamentoEmEdicaoId}.${extensao}`;
+      const { error: erroUpload } = await sb.storage
+        .from("equipamentos")
+        .upload(caminho, file, { upsert: true, contentType: file.type });
+      if (erroUpload) {
+        toast("Erro ao enviar a foto");
+        console.error(erroUpload);
+        return;
+      }
+      const { data: urlData } = sb.storage.from("equipamentos").getPublicUrl(caminho);
+      payload.foto_url = `${urlData.publicUrl}?v=${Date.now()}`;
+    }
+
+    const { error: erroUpsert } = await sb.from("equipamento_fotos").upsert(payload);
+    if (erroUpsert) {
+      toast("Erro ao salvar equipamento");
+      console.error(erroUpsert);
+      return;
+    }
+
+    toast("Equipamento atualizado");
+    document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
+    await carregarFotosEquipamento();
+    renderChipsCategoria();
+    renderEquipGrid();
+    return;
+  }
+
+  // Editando um equipamento PRÓPRIO já existente
+  if (equipamentoEmEdicaoId) {
     const payload = { nome, categoria };
     if (file) {
       const extensao = file.name.split(".").pop().toLowerCase();
-      const caminho = `custom-${equipamentoCustomEmEdicaoId}.${extensao}`;
+      const caminho = `custom-${equipamentoEmEdicaoId}.${extensao}`;
       const { error: erroUpload } = await sb.storage
         .from("equipamentos")
         .upload(caminho, file, { upsert: true, contentType: file.type });
@@ -370,7 +383,7 @@ async function salvarNovoEquipamento(e) {
     const { error: erroUpdate } = await sb
       .from("equipamentos_customizados")
       .update(payload)
-      .eq("id", equipamentoCustomEmEdicaoId);
+      .eq("id", equipamentoEmEdicaoId);
     if (erroUpdate) {
       toast("Erro ao salvar equipamento");
       console.error(erroUpdate);
@@ -385,7 +398,7 @@ async function salvarNovoEquipamento(e) {
     return;
   }
 
-  // Modo criação
+  // Criando um equipamento próprio novo
   const novoId = crypto.randomUUID();
   const extensao = file.name.split(".").pop().toLowerCase();
   const caminho = `custom-${novoId}.${extensao}`;
@@ -765,7 +778,7 @@ function svgComNamespaceEtamanho(svgString, largura, altura) {
 
 async function iconeOuFotoParaPng(equip, tamanho) {
   if (!equip) return null;
-  const fotoUrl = equip.foto_url || equipamentoFotosCache[equip.id];
+  const fotoUrl = equip.foto_url;
   if (fotoUrl) {
     try {
       return await carregarImagemQuadrada(fotoUrl, tamanho, true);
