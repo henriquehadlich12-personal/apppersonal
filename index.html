@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12141A" />
-<link rel="stylesheet" href="style.css?v=8" />
+<link rel="stylesheet" href="style.css?v=9" />
 </head>
 <body>
 
@@ -296,7 +296,7 @@
   <div id="sheet-novo-equipamento" class="sheet-overlay is-hidden">
     <div class="sheet">
       <div class="sheet-handle"></div>
-      <h2>Novo equipamento</h2>
+      <h2 id="titulo-sheet-equipamento">Novo equipamento</h2>
       <form id="form-novo-equipamento">
         <div class="field">
           <label class="field-label" for="input-equip-nome">Nome do equipamento</label>
@@ -311,12 +311,15 @@
           <input type="text" id="input-equip-categoria-nova" class="field-input" placeholder="Ex: Funcional" />
         </div>
         <div class="field">
-          <label class="field-label" for="input-equip-foto">Foto (escolher dos arquivos)</label>
-          <input type="file" id="input-equip-foto" class="field-input" accept="image/*" required />
+          <label class="field-label" for="input-equip-foto" id="label-equip-foto">Foto (escolher dos arquivos)</label>
+          <input type="file" id="input-equip-foto" class="field-input" accept="image/*" />
         </div>
         <div class="sheet-actions">
           <button type="submit" class="primary-btn">Salvar equipamento</button>
           <button type="button" id="btn-cancelar-novo-equipamento" class="secondary-btn">Cancelar</button>
+        </div>
+        <div class="sheet-actions" id="area-excluir-equipamento" style="margin-top:0;">
+          <button type="button" id="btn-excluir-equipamento" class="danger-btn">Excluir equipamento</button>
         </div>
       </form>
     </div>
@@ -346,10 +349,10 @@
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
-  <script src="logo.js?v=8"></script>
-  <script src="equipamentos.js?v=8"></script>
-  <script src="app.js?v=8"></script>
-  <script src="avaliacao.js?v=8"></script>
-  <script src="treinos.js?v=8"></script>
+  <script src="logo.js?v=9"></script>
+  <script src="equipamentos.js?v=9"></script>
+  <script src="app.js?v=9"></script>
+  <script src="avaliacao.js?v=9"></script>
+  <script src="treinos.js?v=9"></script>
 </body>
 </html>

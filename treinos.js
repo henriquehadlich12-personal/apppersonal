@@ -184,20 +184,27 @@ function renderEquipGrid() {
   }
 
   lista.forEach((equip) => {
+    const ehCustomizado = !equip.svg;
     const card = document.createElement("button");
     card.type = "button";
     card.className = "equip-card";
     card.innerHTML = `
-      <button type="button" class="equip-card-photo-btn" aria-label="Adicionar foto real">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>
+      <button type="button" class="equip-card-photo-btn" aria-label="${ehCustomizado ? "Editar equipamento" : "Adicionar foto real"}">
+        ${ehCustomizado
+          ? '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>'
+          : '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13.5" r="3.2"/></svg>'}
       </button>
       <div class="equip-icon">${visualEquipamentoHtml(equip)}</div>
       <div class="equip-nome">${equip.nome}</div>`;
     card.addEventListener("click", () => abrirSheetItemTreino(equip));
     card.querySelector(".equip-card-photo-btn").addEventListener("click", (e) => {
       e.stopPropagation();
-      equipamentoUploadAtual = equip;
-      document.getElementById("input-foto-equipamento").click();
+      if (ehCustomizado) {
+        abrirSheetEditarEquipamento(equip);
+      } else {
+        equipamentoUploadAtual = equip;
+        document.getElementById("input-foto-equipamento").click();
+      }
     });
     grid.appendChild(card);
   });
@@ -262,13 +269,38 @@ async function handleFotoEquipamentoSelecionada(e) {
 // Cadastro de equipamento próprio (nome, categoria e foto)
 // ------------------------------------------------------------
 
+let equipamentoCustomEmEdicaoId = null;
+
 function abrirSheetNovoEquipamento() {
+  equipamentoCustomEmEdicaoId = null;
   document.getElementById("form-novo-equipamento").reset();
+  document.getElementById("titulo-sheet-equipamento").textContent = "Novo equipamento";
+  document.getElementById("label-equip-foto").textContent = "Foto (escolher dos arquivos)";
+  document.getElementById("area-excluir-equipamento").classList.add("is-hidden");
 
   const select = document.getElementById("select-equip-categoria");
   select.innerHTML = todasCategorias().map((c) => `<option value="${c}">${c}</option>`).join("")
     + `<option value="__nova__">+ Nova categoria...</option>`;
   document.getElementById("campo-nova-categoria").classList.add("is-hidden");
+
+  document.getElementById("sheet-novo-equipamento").classList.remove("is-hidden");
+}
+
+function abrirSheetEditarEquipamento(equip) {
+  equipamentoCustomEmEdicaoId = equip.id;
+  document.getElementById("form-novo-equipamento").reset();
+  document.getElementById("titulo-sheet-equipamento").textContent = "Editar equipamento";
+  document.getElementById("label-equip-foto").textContent = "Trocar foto (opcional)";
+  document.getElementById("area-excluir-equipamento").classList.remove("is-hidden");
+
+  const select = document.getElementById("select-equip-categoria");
+  const categorias = todasCategorias();
+  select.innerHTML = categorias.map((c) => `<option value="${c}">${c}</option>`).join("")
+    + `<option value="__nova__">+ Nova categoria...</option>`;
+  document.getElementById("campo-nova-categoria").classList.add("is-hidden");
+
+  document.getElementById("input-equip-nome").value = equip.nome;
+  select.value = equip.categoria;
 
   document.getElementById("sheet-novo-equipamento").classList.remove("is-hidden");
 }
@@ -280,6 +312,23 @@ document.getElementById("select-equip-categoria").addEventListener("change", (e)
   if (ehNova) document.getElementById("input-equip-categoria-nova").focus();
 });
 
+document.getElementById("btn-excluir-equipamento").addEventListener("click", async () => {
+  if (!equipamentoCustomEmEdicaoId) return;
+  if (!confirm("Excluir este equipamento? Treinos já salvos que o usam vão mostrar apenas o nome, sem ícone.")) return;
+
+  const { error } = await sb.from("equipamentos_customizados").delete().eq("id", equipamentoCustomEmEdicaoId);
+  if (error) {
+    toast("Erro ao excluir equipamento");
+    console.error(error);
+    return;
+  }
+  toast("Equipamento excluído");
+  document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
+  await carregarEquipamentosCustomizados();
+  renderChipsCategoria();
+  renderEquipGrid();
+});
+
 async function salvarNovoEquipamento(e) {
   e.preventDefault();
   const nome = document.getElementById("input-equip-nome").value.trim();
@@ -289,12 +338,54 @@ async function salvarNovoEquipamento(e) {
     : selecaoCategoria;
   const file = document.getElementById("input-equip-foto").files[0];
 
-  if (!nome || !categoria || !file) {
-    toast("Preencha nome, categoria e foto");
+  if (!nome || !categoria) {
+    toast("Preencha nome e categoria");
+    return;
+  }
+  if (!equipamentoCustomEmEdicaoId && !file) {
+    toast("Escolha uma foto para o novo equipamento");
     return;
   }
 
   toast("Salvando equipamento...");
+
+  // Modo edição: atualiza nome/categoria, e a foto só se uma nova foi escolhida
+  if (equipamentoCustomEmEdicaoId) {
+    const payload = { nome, categoria };
+    if (file) {
+      const extensao = file.name.split(".").pop().toLowerCase();
+      const caminho = `custom-${equipamentoCustomEmEdicaoId}.${extensao}`;
+      const { error: erroUpload } = await sb.storage
+        .from("equipamentos")
+        .upload(caminho, file, { upsert: true, contentType: file.type });
+      if (erroUpload) {
+        toast("Erro ao enviar a foto");
+        console.error(erroUpload);
+        return;
+      }
+      const { data: urlData } = sb.storage.from("equipamentos").getPublicUrl(caminho);
+      payload.foto_url = `${urlData.publicUrl}?v=${Date.now()}`;
+    }
+
+    const { error: erroUpdate } = await sb
+      .from("equipamentos_customizados")
+      .update(payload)
+      .eq("id", equipamentoCustomEmEdicaoId);
+    if (erroUpdate) {
+      toast("Erro ao salvar equipamento");
+      console.error(erroUpdate);
+      return;
+    }
+
+    toast("Equipamento atualizado");
+    document.getElementById("sheet-novo-equipamento").classList.add("is-hidden");
+    await carregarEquipamentosCustomizados();
+    renderChipsCategoria();
+    renderEquipGrid();
+    return;
+  }
+
+  // Modo criação
   const novoId = crypto.randomUUID();
   const extensao = file.name.split(".").pop().toLowerCase();
   const caminho = `custom-${novoId}.${extensao}`;
