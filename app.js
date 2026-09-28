@@ -558,11 +558,24 @@ async function excluirAluno(aluno) {
     console.error(countError);
     return;
   }
+
   if (count > 0) {
-    toast("Exclua os horários deste aluno antes de removê-lo");
+    const plural = count === 1 ? "1 agendamento" : `${count} agendamentos`;
+    const remover = confirm(
+      `${aluno.nome} tem ${plural} na agenda (incluindo horários fixos futuros).\n\n` +
+      `Deseja remover ${count === 1 ? "esse agendamento" : "esses agendamentos"} e excluir o aluno?`
+    );
+    if (!remover) return;
+
+    const { error: erroAgend } = await sb.from("agendamentos").delete().eq("aluno_id", aluno.id);
+    if (erroAgend) {
+      toast("Erro ao remover os agendamentos do aluno");
+      console.error(erroAgend);
+      return;
+    }
+  } else if (!confirm(`Excluir ${aluno.nome}?`)) {
     return;
   }
-  if (!confirm(`Excluir ${aluno.nome}?`)) return;
 
   const { error } = await sb.from("alunos").delete().eq("id", aluno.id);
   if (error) {
@@ -572,6 +585,7 @@ async function excluirAluno(aluno) {
   }
   toast("Aluno excluído");
   carregarAlunos();
+  carregarAgendaDoDia();
 }
 
 // ------------------------------------------------------------
