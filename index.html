@@ -10,7 +10,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="icons/icon-180.png" />
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#12141A" />
-<link rel="stylesheet" href="style.css?v=11" />
+<link rel="stylesheet" href="style.css?v=12" />
 </head>
 <body>
 
@@ -218,15 +218,12 @@
           <input type="text" id="input-obs" class="field-input" placeholder="Ex: trocar exercício de perna" />
         </div>
 
-        <div id="campo-serie" class="field field-serie">
-          <label class="checkbox-label">
-            <input type="checkbox" id="check-serie" />
-            Repetir semanalmente (horário fixo)
+        <div id="campo-permanente" class="field field-serie">
+          <label class="checkbox-label checkbox-permanente">
+            <input type="checkbox" id="check-permanente" />
+            <span>PERMANENTE</span>
           </label>
-          <div id="campo-serie-semanas" class="field is-hidden">
-            <label class="field-label" for="input-semanas">Repetir por quantas semanas?</label>
-            <input type="number" id="input-semanas" class="field-input" min="1" max="52" value="8" />
-          </div>
+          <p class="field-hint">Marca este mesmo dia da semana e horário pelo ano inteiro (52 semanas a partir desta data). Se o aluno cancelar, é só tocar no horário e limpar todas as datas.</p>
         </div>
 
         <div class="sheet-actions">
@@ -348,10 +345,10 @@
   <script src="vendor/supabase.js"></script>
   <script src="vendor/jspdf.umd.min.js"></script>
   <script src="config.js"></script>
-  <script src="logo.js?v=11"></script>
-  <script src="equipamentos.js?v=11"></script>
-  <script src="app.js?v=11"></script>
-  <script src="avaliacao.js?v=11"></script>
-  <script src="treinos.js?v=11"></script>
+  <script src="logo.js?v=12"></script>
+  <script src="equipamentos.js?v=12"></script>
+  <script src="app.js?v=12"></script>
+  <script src="avaliacao.js?v=12"></script>
+  <script src="treinos.js?v=12"></script>
 </body>
 </html>

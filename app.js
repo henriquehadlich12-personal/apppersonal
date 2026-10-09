@@ -7,6 +7,7 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const START_HOUR = 6;   // primeira hora do dia
 const END_HOUR = 22;    // última hora do dia (expediente vai até END_HOUR + 1, ou seja 23h)
 const SLOT_MINUTOS = 30; // granularidade da agenda — marca de 30 em 30 min
+const SEMANAS_PERMANENTE = 52; // "Permanente" = o ano inteiro (52 semanas a partir da data escolhida)
 
 const INICIO_MIN = START_HOUR * 60;
 const FIM_MIN = (END_HOUR + 1) * 60;
@@ -204,15 +205,11 @@ function selecionarTipo(tipo) {
   tipoSelecionado = tipo;
   document.querySelectorAll(".tipo-opt").forEach((b) => b.classList.toggle("is-active", b.dataset.tipo === tipo));
   document.getElementById("campo-aluno").classList.toggle("is-hidden", tipo === "bloqueio");
-  document.getElementById("campo-serie").classList.toggle("is-hidden", tipo !== "personal");
+  document.getElementById("campo-permanente").classList.toggle("is-hidden", tipo !== "personal");
 }
 
 document.querySelectorAll(".tipo-opt").forEach((btn) => {
   btn.addEventListener("click", () => selecionarTipo(btn.dataset.tipo));
-});
-
-document.getElementById("check-serie").addEventListener("change", (e) => {
-  document.getElementById("campo-serie-semanas").classList.toggle("is-hidden", !e.target.checked);
 });
 
 function popularSelectAlunos(selecionadoId) {
@@ -241,8 +238,7 @@ function abrirSheetNovo(horaStr) {
   const [h, m] = horaStr.split(":").map(Number);
   const fimMin = h * 60 + m + SLOT_MINUTOS;
   document.getElementById("input-fim").value = minutosParaHora(fimMin);
-  document.getElementById("check-serie").checked = false;
-  document.getElementById("campo-serie-semanas").classList.add("is-hidden");
+  document.getElementById("check-permanente").checked = false;
 
   sheetHorario.classList.remove("is-hidden");
 }
@@ -276,13 +272,13 @@ function abrirSheetDetalhe(agendamento) {
   if (agendamento.serie_id) {
     const btnUm = document.createElement("button");
     btnUm.className = "danger-btn";
-    btnUm.textContent = "Excluir só este";
-    btnUm.addEventListener("click", () => excluirHorario(agendamento, "um"));
+    btnUm.textContent = "Cancelar só esta data";
+    btnUm.addEventListener("click", () => excluirHorario(agendamento));
 
     const btnSerie = document.createElement("button");
     btnSerie.className = "danger-btn";
-    btnSerie.textContent = "Excluir série (futuros)";
-    btnSerie.addEventListener("click", () => excluirHorario(agendamento, "serie"));
+    btnSerie.textContent = "Cancelar personal — limpar todas as datas";
+    btnSerie.addEventListener("click", () => limparSerie(agendamento));
 
     excluirContainer.appendChild(btnUm);
     excluirContainer.appendChild(btnSerie);
@@ -290,7 +286,7 @@ function abrirSheetDetalhe(agendamento) {
     const btnUm = document.createElement("button");
     btnUm.className = "danger-btn";
     btnUm.textContent = "Excluir";
-    btnUm.addEventListener("click", () => excluirHorario(agendamento, "um"));
+    btnUm.addEventListener("click", () => excluirHorario(agendamento));
     excluirContainer.appendChild(btnUm);
   }
 
@@ -299,7 +295,7 @@ function abrirSheetDetalhe(agendamento) {
 
 // Edição altera sempre só esta ocorrência — mesmo se fizer parte de
 // uma série, não recria nem mexe nas outras datas. Por isso a opção
-// de "repetir semanalmente" fica escondida aqui, ela só faz sentido
+// de "permanente" fica escondida aqui, ela só faz sentido
 // na criação.
 function abrirSheetParaEditar(agendamento) {
   editandoId = agendamento.id;
@@ -313,9 +309,8 @@ function abrirSheetParaEditar(agendamento) {
   document.getElementById("input-inicio").value = horaCurta(agendamento.hora_inicio);
   document.getElementById("input-fim").value = horaCurta(agendamento.hora_fim);
   document.getElementById("input-obs").value = agendamento.observacoes || "";
-  document.getElementById("check-serie").checked = false;
-  document.getElementById("campo-serie-semanas").classList.add("is-hidden");
-  document.getElementById("campo-serie").classList.add("is-hidden");
+  document.getElementById("check-permanente").checked = false;
+  document.getElementById("campo-permanente").classList.add("is-hidden");
 }
 
 document.getElementById("btn-fechar-detalhe").addEventListener("click", () => {
@@ -326,29 +321,60 @@ document.getElementById("btn-cancelar-horario").addEventListener("click", () => 
   sheetHorario.classList.add("is-hidden");
 });
 
-async function excluirHorario(agendamento, escopo) {
-  const confirmMsg = escopo === "serie"
-    ? "Excluir este horário e todos os futuros da mesma série?"
+async function excluirHorario(agendamento) {
+  const msg = agendamento.serie_id
+    ? "Cancelar só esta data? As outras datas do horário permanente continuam."
     : "Excluir este horário?";
-  if (!confirm(confirmMsg)) return;
+  if (!confirm(msg)) return;
 
-  let error;
-  if (escopo === "serie") {
-    ({ error } = await sb
-      .from("agendamentos")
-      .delete()
-      .eq("serie_id", agendamento.serie_id)
-      .gte("data", agendamento.data));
-  } else {
-    ({ error } = await sb.from("agendamentos").delete().eq("id", agendamento.id));
-  }
-
+  const { error } = await sb.from("agendamentos").delete().eq("id", agendamento.id);
   if (error) {
     toast("Erro ao excluir");
     console.error(error);
     return;
   }
   toast("Excluído");
+  sheetHorario.classList.add("is-hidden");
+  carregarAgendaDoDia();
+}
+
+// Aluno cancelou o personal: apaga TODAS as datas da série de uma vez,
+// de hoje em diante. Datas que já passaram ficam no histórico.
+async function limparSerie(agendamento) {
+  const hoje = isoDate(new Date());
+
+  const { count, error: erroCount } = await sb
+    .from("agendamentos")
+    .select("id", { count: "exact", head: true })
+    .eq("serie_id", agendamento.serie_id)
+    .gte("data", hoje);
+
+  if (erroCount) {
+    toast("Erro ao consultar a série");
+    console.error(erroCount);
+    return;
+  }
+
+  const nome = agendamento.alunos ? agendamento.alunos.nome : "o aluno";
+  const hora = horaCurta(agendamento.hora_inicio);
+  if (!count) {
+    toast("Não há datas futuras nesta série");
+    return;
+  }
+  if (!confirm(`Limpar todas as datas de ${nome} às ${hora}?\n\nVão sair ${count} data(s) da agenda, de hoje em diante. Isso não pode ser desfeito.`)) return;
+
+  const { error } = await sb
+    .from("agendamentos")
+    .delete()
+    .eq("serie_id", agendamento.serie_id)
+    .gte("data", hoje);
+
+  if (error) {
+    toast("Erro ao limpar a série");
+    console.error(error);
+    return;
+  }
+  toast(`${count} data(s) removida(s)`);
   sheetHorario.classList.add("is-hidden");
   carregarAgendaDoDia();
 }
@@ -360,8 +386,7 @@ formHorario.addEventListener("submit", async (e) => {
   const fim = document.getElementById("input-fim").value;
   const obs = document.getElementById("input-obs").value || null;
   const alunoId = document.getElementById("select-aluno").value || null;
-  const emSerie = document.getElementById("check-serie").checked;
-  const semanas = parseInt(document.getElementById("input-semanas").value || "1", 10);
+  const permanente = document.getElementById("check-permanente").checked;
 
   if (tipoSelecionado !== "bloqueio" && !alunoId) {
     toast("Selecione um aluno");
@@ -389,10 +414,10 @@ formHorario.addEventListener("submit", async (e) => {
     return;
   }
 
-  if (tipoSelecionado === "personal" && emSerie) {
+  if (tipoSelecionado === "personal" && permanente) {
     const serieId = crypto.randomUUID();
     const linhas = [];
-    for (let i = 0; i < semanas; i++) {
+    for (let i = 0; i < SEMANAS_PERMANENTE; i++) {
       const data = addDays(currentDate, i * 7);
       linhas.push({
         aluno_id: alunoId,
@@ -406,11 +431,11 @@ formHorario.addEventListener("submit", async (e) => {
     }
     const { error } = await sb.from("agendamentos").insert(linhas);
     if (error) {
-      toast("Erro ao salvar série");
+      toast("Erro ao salvar horário permanente");
       console.error(error);
       return;
     }
-    toast("Série criada");
+    toast(`Permanente criado: ${SEMANAS_PERMANENTE} semanas`);
   } else {
     const linha = {
       aluno_id: tipoSelecionado === "bloqueio" ? null : alunoId,

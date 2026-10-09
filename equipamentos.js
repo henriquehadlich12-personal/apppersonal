@@ -174,7 +174,7 @@ const EQUIPAMENTOS = [
   {
     id: "rosca_direta",
     nome: "Rosca Direta (Barra W)",
-    categoria: "Braços",
+    categoria: "Bíceps",
     svg: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M10 20 L16 20 L20 26 L28 26 L32 20 L38 20"/>
       <circle cx="8" cy="20" r="3.5"/>
@@ -184,7 +184,7 @@ const EQUIPAMENTOS = [
   {
     id: "triceps_pulley",
     nome: "Tríceps Pulley",
-    categoria: "Braços",
+    categoria: "Bíceps",
     svg: `<svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="24" cy="10" r="4"/>
       <path d="M24 14 L24 26"/>

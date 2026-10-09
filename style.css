@@ -559,6 +559,24 @@ textarea.field-input {
   border-radius: 10px;
 }
 
+.checkbox-permanente {
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+
+.checkbox-permanente input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.field-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-muted, #8B949E);
+}
+
 .sheet-actions {
   display: flex;
   gap: 10px;
