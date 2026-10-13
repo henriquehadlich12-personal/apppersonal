@@ -996,3 +996,77 @@ textarea.field-input {
   margin-top: 4px;
   word-break: break-all;
 }
+
+/* ============================================================
+   Bi-set / Tri-set (montagem do treino)
+   ============================================================ */
+
+.modo-serie { margin-bottom: 8px; }
+
+.bloco-banner {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(255, 138, 61, 0.12);
+  border: 1px solid rgba(255, 138, 61, 0.4);
+  color: var(--text);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+.bloco-banner-escolhidos { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+
+.draft-bloco {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--cor-personal);
+  border-radius: 12px;
+  padding: 10px 12px 6px;
+}
+.draft-bloco-tri { border-left-color: var(--cor-avaliacao); }
+.draft-bloco-x { border-left-color: var(--cor-vago); }
+
+.draft-bloco-topo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+.draft-bloco-titulo { flex: 1; min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.draft-bloco-pill {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--cor-personal);
+  color: #0D1117;
+}
+.draft-bloco-tri .draft-bloco-pill { background: var(--cor-avaliacao); }
+.draft-bloco-x .draft-bloco-pill { background: var(--cor-vago); }
+.draft-bloco-resumo { font-size: 12px; color: var(--text-muted); }
+
+.draft-bloco-itens { display: flex; flex-direction: column; }
+.draft-bloco-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px solid var(--border);
+}
+.draft-bloco-letra {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}

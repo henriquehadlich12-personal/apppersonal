@@ -7,7 +7,38 @@ const NOME_PERSONAL = "Henrique Mateus Hadlich";
 let treinosInicializado = false;
 let alunoTreinoSelecionadoId = null;
 let categoriaAtiva = "Todos";
-let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes, video_url }
+let treinoDraftItems = []; // { equipamento_id, series, repeticoes, carga, observacoes, video_url, grupo, descanso }
+// "grupo" igual em itens vizinhos = bloco feito em sequência (bi-set = 2, tri-set = 3).
+let modoSerie = "normal"; // "normal" | "biset" | "triset"
+let blocoPendente = null; // bloco em montagem: { tamanho, itens: [], series, descanso }
+
+const TIPOS_BLOCO = {
+  2: { rotulo: "BI-SET", cor: [255, 138, 61], tint: [255, 242, 232] },
+  3: { rotulo: "TRI-SET", cor: [140, 90, 230], tint: [244, 238, 255] },
+};
+
+function tipoDoBloco(qtd) {
+  return TIPOS_BLOCO[qtd] || (qtd > 3 ? { rotulo: "SÉRIE COMBINADA", cor: [60, 140, 120], tint: [234, 247, 243] } : null);
+}
+
+// Junta itens vizinhos com o mesmo "grupo" num bloco. Item sem grupo = bloco de 1.
+function agruparEmBlocos(itens) {
+  const blocos = [];
+  itens.forEach((item, i) => {
+    const ultimo = blocos[blocos.length - 1];
+    if (item.grupo != null && ultimo && ultimo.grupo === item.grupo) {
+      ultimo.itens.push(item);
+      ultimo.fim = i + 1;
+    } else {
+      blocos.push({ grupo: item.grupo != null ? item.grupo : null, itens: [item], inicio: i, fim: i + 1 });
+    }
+  });
+  return blocos;
+}
+
+function proximoGrupoId() {
+  return treinoDraftItems.reduce((max, i) => Math.max(max, i.grupo || 0), 0) + 1;
+}
 let equipamentoEmEdicao = null;
 let equipamentoOverridesCache = {}; // { equipamento_id: {foto_url, nome, categoria, oculto} } — sobreposição pro catálogo fixo
 let treinoEmEdicaoId = null;
@@ -105,6 +136,10 @@ function inicializarTreinos() {
     document.getElementById("form-item-treino").addEventListener("submit", confirmarItemTreino);
     document.getElementById("btn-excluir-todos-treinos").addEventListener("click", excluirTodosTreinos);
     document.getElementById("btn-cancelar-edicao-treino").addEventListener("click", cancelarEdicaoTreino);
+    document.querySelectorAll("#modo-serie .tipo-opt").forEach((btn) => {
+      btn.addEventListener("click", () => selecionarModoSerie(btn.dataset.modo));
+    });
+    document.getElementById("btn-cancelar-bloco").addEventListener("click", () => selecionarModoSerie("normal", true));
     document.getElementById("input-busca-equip").addEventListener("input", (e) => {
       termoBuscaEquip = e.target.value;
       renderEquipGrid();
@@ -432,30 +467,177 @@ async function salvarNovoEquipamento(e) {
 }
 
 // ------------------------------------------------------------
+// Modo Normal / Bi-set / Tri-set
+// Bi-set = 2 exercícios seguidos, sem descanso entre eles; tri-set = 3.
+// O descanso só vale no fim de cada rodada. Os exercícios do bloco são
+// escolhidos um por vez e só entram no treino quando o bloco fecha.
+// ------------------------------------------------------------
+
+function selecionarModoSerie(modo, forcar) {
+  const temPendente = blocoPendente && blocoPendente.itens.length > 0;
+  if (temPendente && !forcar && !confirm("Descartar o bloco que está sendo montado?")) return;
+  if (temPendente && forcar && !confirm("Cancelar o bloco em montagem? Os exercícios escolhidos nele serão descartados.")) return;
+
+  modoSerie = modo;
+  blocoPendente = modo === "normal" ? null : { tamanho: modo === "biset" ? 2 : 3, itens: [], series: 3, descanso: null };
+
+  document.querySelectorAll("#modo-serie .tipo-opt").forEach((b) => b.classList.toggle("is-active", b.dataset.modo === modo));
+  const ajuda = document.getElementById("modo-serie-ajuda");
+  if (modo === "normal") {
+    ajuda.classList.add("is-hidden");
+  } else {
+    const n = blocoPendente.tamanho;
+    ajuda.textContent = `${n === 2 ? "Bi-set" : "Tri-set"}: ${n} exercícios feitos em sequência, sem descanso entre eles. O descanso vem só no fim de cada rodada.`;
+    ajuda.classList.remove("is-hidden");
+  }
+  renderBannerBloco();
+}
+
+function letraDoExercicio(posicao) {
+  return String.fromCharCode(65 + posicao); // 0 -> A, 1 -> B, 2 -> C
+}
+
+function renderBannerBloco() {
+  const banner = document.getElementById("bloco-banner");
+  if (!blocoPendente) {
+    banner.classList.add("is-hidden");
+    return;
+  }
+  const tipo = tipoDoBloco(blocoPendente.tamanho);
+  const escolhidos = blocoPendente.itens
+    .map((it, i) => `${letraDoExercicio(i)}: ${equipamentoPorIdGeral(it.equipamento_id).nome}`)
+    .join("  ·  ");
+  const proxima = letraDoExercicio(blocoPendente.itens.length);
+  document.getElementById("bloco-banner-texto").innerHTML =
+    `<strong>${tipo.rotulo}</strong> — toque no equipamento do exercício <strong>${proxima}</strong> (${blocoPendente.itens.length + 1} de ${blocoPendente.tamanho})` +
+    (escolhidos ? `<div class="bloco-banner-escolhidos">${escolhidos}</div>` : "");
+  banner.classList.remove("is-hidden");
+}
+
+// ------------------------------------------------------------
 // Sheet para configurar séries/reps/carga/obs de um equipamento
 // ------------------------------------------------------------
 
 function abrirSheetItemTreino(equip) {
   equipamentoEmEdicao = equip;
-  document.getElementById("sheet-item-titulo").textContent = equip.nome;
+  const emBloco = !!blocoPendente;
+  const posicao = emBloco ? blocoPendente.itens.length : 0;
+  const ehPrimeiro = posicao === 0;
+  const ehUltimo = emBloco && posicao === blocoPendente.tamanho - 1;
+  const tipo = emBloco ? tipoDoBloco(blocoPendente.tamanho) : null;
+
+  document.getElementById("sheet-item-titulo").textContent = emBloco
+    ? `${tipo.rotulo} · ${letraDoExercicio(posicao)} — ${equip.nome}`
+    : equip.nome;
   document.getElementById("form-item-treino").reset();
   document.getElementById("input-item-series").value = 3;
   document.getElementById("input-item-reps").value = "15-12-10";
+
+  // Séries e descanso são do bloco todo: só perguntamos no primeiro exercício.
+  document.getElementById("campo-item-series").classList.toggle("is-hidden", emBloco && !ehPrimeiro);
+  document.getElementById("label-item-series").textContent = emBloco ? "Séries (rodadas)" : "Séries";
+  document.getElementById("campo-item-descanso").classList.toggle("is-hidden", !(emBloco && ehPrimeiro));
+
+  const btn = document.querySelector("#form-item-treino button[type='submit']");
+  btn.textContent = !emBloco ? "Adicionar ao treino" : ehUltimo ? `Concluir ${tipo.rotulo.toLowerCase()}` : "Próximo exercício";
+
   document.getElementById("sheet-item-treino").classList.remove("is-hidden");
 }
 
 function confirmarItemTreino(e) {
   e.preventDefault();
-  treinoDraftItems.push({
+  const base = {
     equipamento_id: equipamentoEmEdicao.id,
-    series: parseInt(document.getElementById("input-item-series").value || "0", 10) || null,
     repeticoes: document.getElementById("input-item-reps").value || null,
     carga: document.getElementById("input-item-carga").value || null,
     observacoes: document.getElementById("input-item-obs").value || null,
     video_url: document.getElementById("input-item-video").value || null,
-  });
+  };
+  const series = parseInt(document.getElementById("input-item-series").value || "0", 10) || null;
+
+  if (!blocoPendente) {
+    treinoDraftItems.push({ ...base, series, grupo: null, descanso: null });
+  } else {
+    if (blocoPendente.itens.length === 0) {
+      blocoPendente.series = series;
+      blocoPendente.descanso = document.getElementById("input-item-descanso").value.trim() || null;
+    }
+    blocoPendente.itens.push(base);
+
+    if (blocoPendente.itens.length < blocoPendente.tamanho) {
+      document.getElementById("sheet-item-treino").classList.add("is-hidden");
+      renderBannerBloco();
+      return;
+    }
+
+    // Bloco completo: entra no treino de uma vez, com o mesmo grupo,
+    // séries e descanso em todos os exercícios.
+    const grupo = proximoGrupoId();
+    blocoPendente.itens.forEach((it) => {
+      treinoDraftItems.push({ ...it, series: blocoPendente.series, grupo, descanso: blocoPendente.descanso });
+    });
+    toast(`${tipoDoBloco(blocoPendente.tamanho).rotulo} adicionado`);
+    blocoPendente = null; // bloco concluído: nada a descartar ao voltar pro modo normal
+    selecionarModoSerie("normal", false);
+  }
+
   document.getElementById("sheet-item-treino").classList.add("is-hidden");
   renderTreinoDraftList();
+}
+
+const SVG_SETA_CIMA = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>`;
+const SVG_SETA_BAIXO = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>`;
+const SVG_X = `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>`;
+
+function htmlReordenar(posicao, total) {
+  return `
+    <div class="draft-item-reorder">
+      <button type="button" class="reorder-btn" data-dir="up" aria-label="Mover para cima" ${posicao === 0 ? "disabled" : ""}>${SVG_SETA_CIMA}</button>
+      <button type="button" class="reorder-btn" data-dir="down" aria-label="Mover para baixo" ${posicao === total - 1 ? "disabled" : ""}>${SVG_SETA_BAIXO}</button>
+    </div>`;
+}
+
+// Move o bloco inteiro (um exercício normal conta como bloco de 1).
+function moverBloco(posicao, direcao) {
+  const blocos = agruparEmBlocos(treinoDraftItems);
+  const alvo = posicao + direcao;
+  if (alvo < 0 || alvo >= blocos.length) return;
+  const lista = blocos.map((b) => b.itens);
+  [lista[posicao], lista[alvo]] = [lista[alvo], lista[posicao]];
+  treinoDraftItems = lista.flat();
+  renderTreinoDraftList();
+}
+
+function ligarReordenar(el, posicao) {
+  el.querySelectorAll(".reorder-btn").forEach((btn) => {
+    btn.addEventListener("click", () => moverBloco(posicao, btn.dataset.dir === "up" ? -1 : 1));
+  });
+}
+
+// Se sobrar só um exercício num bloco (o outro foi removido), ele volta a ser normal.
+function normalizarBlocosDraft() {
+  agruparEmBlocos(treinoDraftItems).forEach((b) => {
+    if (b.itens.length === 1 && b.itens[0].grupo != null) {
+      b.itens[0].grupo = null;
+      b.itens[0].descanso = null;
+    }
+  });
+}
+
+function removerItemDraft(item) {
+  const idx = treinoDraftItems.indexOf(item);
+  if (idx >= 0) treinoDraftItems.splice(idx, 1);
+  normalizarBlocosDraft();
+  renderTreinoDraftList();
+}
+
+function htmlInfoItemDraft(item, equip, mostrarSeries) {
+  const partes = `${mostrarSeries && item.series ? item.series + "x " : ""}${item.repeticoes || ""}${item.carga ? " · " + item.carga : ""}`;
+  return `
+    <div class="draft-item-nome">${equip.nome}</div>
+    <div class="draft-item-sub">${partes}</div>
+    ${item.observacoes ? `<div class="draft-item-obs">${item.observacoes}</div>` : ""}
+    ${item.video_url ? `<a href="${item.video_url}" target="_blank" rel="noopener" class="draft-item-video">Link de apoio: ${item.video_url}</a>` : ""}`;
 }
 
 function renderTreinoDraftList() {
@@ -469,44 +651,66 @@ function renderTreinoDraftList() {
   }
   vazio.classList.add("is-hidden");
 
-  treinoDraftItems.forEach((item, index) => {
-    const equip = equipamentoPorIdGeral(item.equipamento_id);
-    const row = document.createElement("div");
-    row.className = "draft-item";
-    row.innerHTML = `
-      <div class="draft-item-reorder">
-        <button type="button" class="reorder-btn" data-dir="up" aria-label="Mover para cima" ${index === 0 ? "disabled" : ""}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
-        </button>
-        <button type="button" class="reorder-btn" data-dir="down" aria-label="Mover para baixo" ${index === treinoDraftItems.length - 1 ? "disabled" : ""}>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
-        </button>
-      </div>
-      <div class="equip-icon equip-icon-sm">${visualEquipamentoHtml(equip)}</div>
-      <div class="draft-item-info">
-        <div class="draft-item-nome">${equip.nome}</div>
-        <div class="draft-item-sub">
-          ${item.series ? item.series + "x " : ""}${item.repeticoes || ""}${item.carga ? " · " + item.carga : ""}
+  const blocos = agruparEmBlocos(treinoDraftItems);
+  blocos.forEach((bloco, posicao) => {
+    if (bloco.itens.length === 1) {
+      const item = bloco.itens[0];
+      const equip = equipamentoPorIdGeral(item.equipamento_id);
+      const row = document.createElement("div");
+      row.className = "draft-item";
+      row.innerHTML = `
+        ${htmlReordenar(posicao, blocos.length)}
+        <div class="equip-icon equip-icon-sm">${visualEquipamentoHtml(equip)}</div>
+        <div class="draft-item-info">${htmlInfoItemDraft(item, equip, true)}</div>
+        <button type="button" class="icon-action icon-action-danger" aria-label="Remover">${SVG_X}</button>`;
+      ligarReordenar(row, posicao);
+      row.querySelector(".icon-action-danger").addEventListener("click", () => removerItemDraft(item));
+      container.appendChild(row);
+      return;
+    }
+
+    // Bloco (bi-set / tri-set)
+    const tipo = tipoDoBloco(bloco.itens.length);
+    const primeiro = bloco.itens[0];
+    const resumo = [
+      primeiro.series ? `${primeiro.series} séries` : null,
+      "sem pausa entre os exercícios",
+      primeiro.descanso ? `descanso ${primeiro.descanso}` : null,
+    ].filter(Boolean).join(" · ");
+
+    const card = document.createElement("div");
+    card.className = `draft-bloco draft-bloco-${bloco.itens.length === 2 ? "bi" : bloco.itens.length === 3 ? "tri" : "x"}`;
+    card.innerHTML = `
+      <div class="draft-bloco-topo">
+        ${htmlReordenar(posicao, blocos.length)}
+        <div class="draft-bloco-titulo">
+          <span class="draft-bloco-pill">${tipo.rotulo}</span>
+          <span class="draft-bloco-resumo">${resumo}</span>
         </div>
-        ${item.observacoes ? `<div class="draft-item-obs">${item.observacoes}</div>` : ""}
-        ${item.video_url ? `<a href="${item.video_url}" target="_blank" rel="noopener" class="draft-item-video">Link de apoio: ${item.video_url}</a>` : ""}
+        <button type="button" class="icon-action icon-action-danger" data-acao="remover-bloco" aria-label="Remover bloco inteiro">${SVG_X}</button>
       </div>
-      <button type="button" class="icon-action icon-action-danger" aria-label="Remover">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
-      </button>`;
-    row.querySelectorAll(".reorder-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const alvo = btn.dataset.dir === "up" ? index - 1 : index + 1;
-        if (alvo < 0 || alvo >= treinoDraftItems.length) return;
-        [treinoDraftItems[index], treinoDraftItems[alvo]] = [treinoDraftItems[alvo], treinoDraftItems[index]];
-        renderTreinoDraftList();
-      });
-    });
-    row.querySelector(".icon-action-danger").addEventListener("click", () => {
-      treinoDraftItems.splice(index, 1);
+      <div class="draft-bloco-itens"></div>`;
+    ligarReordenar(card, posicao);
+    card.querySelector('[data-acao="remover-bloco"]').addEventListener("click", () => {
+      if (!confirm(`Remover o ${tipo.rotulo.toLowerCase()} inteiro (${bloco.itens.length} exercícios)?`)) return;
+      treinoDraftItems.splice(bloco.inicio, bloco.fim - bloco.inicio);
       renderTreinoDraftList();
     });
-    container.appendChild(row);
+
+    const lista = card.querySelector(".draft-bloco-itens");
+    bloco.itens.forEach((item, k) => {
+      const equip = equipamentoPorIdGeral(item.equipamento_id);
+      const linha = document.createElement("div");
+      linha.className = "draft-bloco-item";
+      linha.innerHTML = `
+        <span class="draft-bloco-letra">${letraDoExercicio(k)}</span>
+        <div class="equip-icon equip-icon-sm">${visualEquipamentoHtml(equip)}</div>
+        <div class="draft-item-info">${htmlInfoItemDraft(item, equip, false)}</div>
+        <button type="button" class="icon-action icon-action-danger" aria-label="Remover exercício do bloco">${SVG_X}</button>`;
+      linha.querySelector(".icon-action-danger").addEventListener("click", () => removerItemDraft(item));
+      lista.appendChild(linha);
+    });
+    container.appendChild(card);
   });
 }
 
@@ -525,6 +729,8 @@ function editarTreino(treino) {
       carga: i.carga,
       observacoes: i.observacoes,
       video_url: i.video_url,
+      grupo: i.grupo != null ? i.grupo : null,
+      descanso: i.descanso || null,
     }));
   document.getElementById("input-treino-titulo").value = treino.titulo || "";
   document.getElementById("btn-salvar-treino").textContent = "Salvar alterações";
@@ -537,6 +743,8 @@ function editarTreino(treino) {
 function cancelarEdicaoTreino() {
   treinoEmEdicaoId = null;
   treinoDraftItems = [];
+  blocoPendente = null;
+  selecionarModoSerie("normal", false);
   document.getElementById("input-treino-titulo").value = "";
   document.getElementById("btn-salvar-treino").textContent = "Salvar treino";
   document.getElementById("btn-cancelar-edicao-treino").classList.add("is-hidden");
@@ -550,6 +758,10 @@ async function salvarTreino() {
   }
   if (treinoDraftItems.length === 0) {
     toast("Adicione ao menos um equipamento");
+    return;
+  }
+  if (blocoPendente && blocoPendente.itens.length > 0) {
+    toast("Conclua ou cancele o bi-set/tri-set em montagem");
     return;
   }
 
@@ -587,15 +799,19 @@ async function salvarTreino() {
     treinoId = treino.id;
   }
 
-  const itens = treinoDraftItems.map((item, index) => ({
-    treino_id: treinoId,
-    ordem: index,
-    ...item,
-  }));
+  // grupo/descanso só vão quando o item faz parte de um bi-set/tri-set —
+  // assim treinos normais continuam salvando mesmo sem o patch12.
+  const itens = treinoDraftItems.map((item, index) => {
+    const linha = { treino_id: treinoId, ordem: index, ...item };
+    if (linha.grupo == null) delete linha.grupo;
+    if (linha.descanso == null) delete linha.descanso;
+    return linha;
+  });
 
   const { error: erroItens } = await sb.from("treino_itens").insert(itens);
   if (erroItens) {
-    toast("Erro ao salvar exercícios do treino");
+    const faltaPatch = /grupo|descanso/i.test(erroItens.message || "");
+    toast(faltaPatch ? "Falta rodar o patch12 no Supabase (bi-set/tri-set)" : "Erro ao salvar exercícios do treino");
     console.error(erroItens);
     return;
   }
@@ -629,6 +845,15 @@ async function carregarHistoricoTreinos() {
   renderHistoricoTreinos(data);
 }
 
+function resumoTreino(treino) {
+  const itens = [...treino.treino_itens].sort((a, b) => a.ordem - b.ordem);
+  const blocos = agruparEmBlocos(itens);
+  const nBi = blocos.filter((b) => b.itens.length === 2).length;
+  const nTri = blocos.filter((b) => b.itens.length === 3).length;
+  const extras = [nBi ? `${nBi} bi-set${nBi > 1 ? "s" : ""}` : null, nTri ? `${nTri} tri-set${nTri > 1 ? "s" : ""}` : null].filter(Boolean);
+  return `${itens.length} exercícios` + (extras.length ? ` · ${extras.join(", ")}` : "");
+}
+
 function renderHistoricoTreinos(treinos) {
   const container = document.getElementById("treinos-historico");
   container.innerHTML = "";
@@ -645,7 +870,7 @@ function renderHistoricoTreinos(treinos) {
     card.innerHTML = `
       <div class="historico-info">
         <div class="historico-titulo">${treino.titulo || "Treino sem nome"}</div>
-        <div class="historico-sub">${dataFormatada} · ${treino.treino_itens.length} exercícios</div>
+        <div class="historico-sub">${dataFormatada} · ${resumoTreino(treino)}</div>
       </div>
       <div class="historico-actions">
         <button class="secondary-btn historico-btn" data-action="pdf">Gerar PDF</button>
@@ -939,24 +1164,27 @@ async function gerarPdfTreino(treino) {
   }
 
   // ---------- Lista de exercícios (zebra + ícone/foto + vídeo) ----------
+  // Exercícios normais seguem a zebra de sempre. Bi-set / tri-set saem como
+  // um bloco colorido: cabeçalho (tipo, séries, descanso) + exercícios 2A, 2B...
   const iconeTamanho = 68;
-  const larguraTexto = larguraPagina - margem - (margem + iconeTamanho + 22) - 14;
+  const textoX = margem + iconeTamanho + 22;
+  const larguraTexto = larguraPagina - margem - textoX - 14;
+  const limiteY = alturaPagina - 60;
+  const larguraLinha = larguraPagina - margem * 2;
 
-  itensOrdenados.forEach((item, index) => {
+  // Quebra cada trecho de texto no espaço disponível ANTES de saber
+  // a altura do bloco — assim nada fica cortado ou vazando pra fora.
+  function medirItem(item, rotulo, mostrarSeries) {
     const equip = equipamentoPorIdGeral(item.equipamento_id);
-    const temVideo = !!item.video_url;
-    const textoX = margem + iconeTamanho + 22;
 
-    // Quebra cada trecho de texto no espaço disponível ANTES de saber
-    // a altura do bloco — assim nada fica cortado ou vazando pra fora.
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    const linhasTitulo = doc.splitTextToSize(`${index + 1}. ${equip ? equip.nome : "Equipamento"}`, larguraTexto);
+    const linhasTitulo = doc.splitTextToSize(`${rotulo}. ${equip ? equip.nome : "Equipamento"}`, larguraTexto);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(10);
     const detalhes = [
-      item.series ? `${item.series} séries` : null,
+      mostrarSeries && item.series ? `${item.series} ${item.series === 1 ? "série" : "séries"}` : null,
       item.repeticoes ? `${item.repeticoes} repetições` : null,
       item.carga ? `Carga: ${item.carga}` : null,
     ].filter(Boolean).join("   ·   ");
@@ -968,7 +1196,7 @@ async function gerarPdfTreino(treino) {
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9.5);
-    const linhasVideo = temVideo ? doc.splitTextToSize(`Link de apoio: ${item.video_url}`, larguraTexto) : [];
+    const linhasVideo = item.video_url ? doc.splitTextToSize(`Link de apoio: ${item.video_url}`, larguraTexto) : [];
 
     const alturaTexto =
       linhasTitulo.length * 15 +
@@ -976,21 +1204,28 @@ async function gerarPdfTreino(treino) {
       linhasObs.length * 12 +
       linhasVideo.length * 12 +
       10;
-    const alturaBloco = Math.max(iconeTamanho + 16, alturaTexto);
+    const altura = Math.max(iconeTamanho + 16, alturaTexto);
+    return { item, linhasTitulo, linhasDetalhes, linhasObs, linhasVideo, altura };
+  }
 
-    if (y + alturaBloco > alturaPagina - 60) {
+  function desenharItem(m, fundo, corBarra) {
+    if (y + m.altura > limiteY) {
       doc.addPage();
       y = 50;
     }
 
-    if (index % 2 === 0) {
-      doc.setFillColor(248, 248, 250);
-      doc.rect(margem, y, larguraPagina - margem * 2, alturaBloco, "F");
+    if (fundo) {
+      doc.setFillColor(fundo[0], fundo[1], fundo[2]);
+      doc.rect(margem, y, larguraLinha, m.altura, "F");
+    }
+    if (corBarra) {
+      doc.setFillColor(corBarra[0], corBarra[1], corBarra[2]);
+      doc.rect(margem, y, 4, m.altura, "F");
     }
 
-    const png = iconesPng[item.equipamento_id];
+    const png = iconesPng[m.item.equipamento_id];
     if (png) {
-      doc.addImage(png, "PNG", margem + 6, y + (alturaBloco - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
+      doc.addImage(png, "PNG", margem + 8, y + (m.altura - iconeTamanho) / 2, iconeTamanho, iconeTamanho);
     }
 
     let linhaY = y + 18;
@@ -998,36 +1233,112 @@ async function gerarPdfTreino(treino) {
     doc.setTextColor(20, 20, 20);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(12);
-    doc.text(linhasTitulo, textoX, linhaY);
-    linhaY += linhasTitulo.length * 15;
+    doc.text(m.linhasTitulo, textoX, linhaY);
+    linhaY += m.linhasTitulo.length * 15;
 
-    if (linhasDetalhes.length) {
+    if (m.linhasDetalhes.length) {
       doc.setFont("helvetica", "normal");
       doc.setFontSize(10);
       doc.setTextColor(100, 100, 100);
-      doc.text(linhasDetalhes, textoX, linhaY);
-      linhaY += linhasDetalhes.length * 13;
+      doc.text(m.linhasDetalhes, textoX, linhaY);
+      linhaY += m.linhasDetalhes.length * 13;
     }
 
-    if (linhasObs.length) {
+    if (m.linhasObs.length) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(9.5);
       doc.setTextColor(140, 140, 140);
-      doc.text(linhasObs, textoX, linhaY);
-      linhaY += linhasObs.length * 12;
+      doc.text(m.linhasObs, textoX, linhaY);
+      linhaY += m.linhasObs.length * 12;
     }
 
-    if (temVideo) {
+    if (m.linhasVideo.length) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
       doc.setTextColor(91, 140, 255);
-      linhasVideo.forEach((linha) => {
-        doc.textWithLink(linha, textoX, linhaY, { url: item.video_url });
+      m.linhasVideo.forEach((linha) => {
+        doc.textWithLink(linha, textoX, linhaY, { url: m.item.video_url });
         linhaY += 12;
       });
     }
 
-    y += alturaBloco + 8;
+    y += m.altura + (corBarra ? 2 : 8);
+  }
+
+  // Faixa do bloco: pílula com o tipo + "3 séries · sem pausa entre os exercícios · descanso 60s"
+  function medirCabecalhoBloco(bloco, tipo) {
+    const primeiro = bloco.itens[0];
+    const partes = [
+      primeiro.series ? `${primeiro.series} ${primeiro.series === 1 ? "série" : "séries"}` : null,
+      "sem pausa entre os exercícios",
+      primeiro.descanso ? `descanso de ${primeiro.descanso} ao final de cada rodada` : null,
+    ].filter(Boolean);
+
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    const larguraPilula = doc.getTextWidth(tipo.rotulo) + 20;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    const larguraInfo = larguraLinha - 12 - larguraPilula - 12 - 12;
+    const linhas = doc.splitTextToSize(partes.join("   ·   "), larguraInfo);
+    return { tipo, linhas, larguraPilula, altura: Math.max(32, linhas.length * 12 + 18) };
+  }
+
+  function desenharCabecalhoBloco(c) {
+    const { tipo, linhas, larguraPilula, altura } = c;
+    doc.setFillColor(tipo.tint[0], tipo.tint[1], tipo.tint[2]);
+    doc.setDrawColor(tipo.cor[0], tipo.cor[1], tipo.cor[2]);
+    doc.setLineWidth(0.8);
+    doc.roundedRect(margem, y, larguraLinha, altura, 8, 8, "FD");
+
+    const pilulaY = y + (altura - 18) / 2;
+    doc.setFillColor(tipo.cor[0], tipo.cor[1], tipo.cor[2]);
+    doc.roundedRect(margem + 12, pilulaY, larguraPilula, 18, 9, 9, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(255, 255, 255);
+    doc.text(tipo.rotulo, margem + 12 + larguraPilula / 2, pilulaY + 12.5, { align: "center" });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9.5);
+    doc.setTextColor(70, 70, 70);
+    const infoX = margem + 12 + larguraPilula + 12;
+    const primeiraLinhaY = y + (altura - linhas.length * 12) / 2 + 9;
+    doc.text(linhas, infoX, primeiraLinhaY);
+
+    y += altura + 4;
+  }
+
+  let numero = 0;
+  let zebra = 0;
+  agruparEmBlocos(itensOrdenados).forEach((bloco) => {
+    numero++;
+
+    if (bloco.itens.length === 1) {
+      const m = medirItem(bloco.itens[0], `${numero}`, true);
+      desenharItem(m, zebra % 2 === 0 ? [248, 248, 250] : null, null);
+      zebra++;
+      return;
+    }
+
+    const tipo = tipoDoBloco(bloco.itens.length);
+    const cab = medirCabecalhoBloco(bloco, tipo);
+    const medidas = bloco.itens.map((it, k) => medirItem(it, `${numero}${letraDoExercicio(k)}`, false));
+    const alturaTotal = cab.altura + 4 + medidas.reduce((soma, m) => soma + m.altura + 2, 0);
+
+    // Mantém o bloco inteiro na mesma página sempre que ele cabe numa página só.
+    const cabeNumaPagina = alturaTotal <= limiteY - 50;
+    const precisaPagina = cabeNumaPagina
+      ? y + alturaTotal > limiteY
+      : y + cab.altura + 4 + medidas[0].altura > limiteY;
+    if (precisaPagina) {
+      doc.addPage();
+      y = 50;
+    }
+
+    desenharCabecalhoBloco(cab);
+    medidas.forEach((m) => desenharItem(m, tipo.tint, tipo.cor));
+    y += 8;
   });
 
   // ---------- Rodapé (com contagem total de páginas) ----------
