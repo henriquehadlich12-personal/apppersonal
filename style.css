@@ -1027,7 +1027,7 @@ textarea.field-input {
   padding: 10px 12px 6px;
 }
 .draft-bloco-tri { border-left-color: var(--cor-avaliacao); }
-.draft-bloco-x { border-left-color: var(--cor-vago); }
+.draft-bloco-x { border-left-color: var(--accent); }
 
 .draft-bloco-topo {
   display: flex;
@@ -1046,7 +1046,7 @@ textarea.field-input {
   color: #0D1117;
 }
 .draft-bloco-tri .draft-bloco-pill { background: var(--cor-avaliacao); }
-.draft-bloco-x .draft-bloco-pill { background: var(--cor-vago); }
+.draft-bloco-x .draft-bloco-pill { background: var(--accent); }
 .draft-bloco-resumo { font-size: 12px; color: var(--text-muted); }
 
 .draft-bloco-itens { display: flex; flex-direction: column; }
@@ -1070,3 +1070,6 @@ textarea.field-input {
   justify-content: center;
   flex-shrink: 0;
 }
+
+/* Exercício normal (fora de bi-set/tri-set): faixa verde, igual ao PDF */
+.draft-item { border-left: 4px solid var(--cor-vago); }

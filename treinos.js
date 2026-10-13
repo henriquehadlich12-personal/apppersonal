@@ -17,8 +17,11 @@ const TIPOS_BLOCO = {
   3: { rotulo: "TRI-SET", cor: [140, 90, 230], tint: [244, 238, 255] },
 };
 
+// Exercício normal (sem bloco): verde claro, para diferenciar de bi-set (laranja) e tri-set (roxo).
+const COR_NORMAL = { cor: [110, 200, 140], tint: [236, 248, 240] };
+
 function tipoDoBloco(qtd) {
-  return TIPOS_BLOCO[qtd] || (qtd > 3 ? { rotulo: "SÉRIE COMBINADA", cor: [60, 140, 120], tint: [234, 247, 243] } : null);
+  return TIPOS_BLOCO[qtd] || (qtd > 3 ? { rotulo: "SÉRIE COMBINADA", cor: [91, 140, 255], tint: [232, 240, 255] } : null);
 }
 
 // Junta itens vizinhos com o mesmo "grupo" num bloco. Item sem grupo = bloco de 1.
@@ -1163,8 +1166,8 @@ async function gerarPdfTreino(treino) {
     y += 26;
   }
 
-  // ---------- Lista de exercícios (zebra + ícone/foto + vídeo) ----------
-  // Exercícios normais seguem a zebra de sempre. Bi-set / tri-set saem como
+  // ---------- Lista de exercícios (cor por tipo + ícone/foto + vídeo) ----------
+  // Exercícios normais saem em verde claro. Bi-set / tri-set saem como
   // um bloco colorido: cabeçalho (tipo, séries, descanso) + exercícios 2A, 2B...
   const iconeTamanho = 68;
   const textoX = margem + iconeTamanho + 22;
@@ -1208,7 +1211,7 @@ async function gerarPdfTreino(treino) {
     return { item, linhasTitulo, linhasDetalhes, linhasObs, linhasVideo, altura };
   }
 
-  function desenharItem(m, fundo, corBarra) {
+  function desenharItem(m, fundo, corBarra, espacoDepois) {
     if (y + m.altura > limiteY) {
       doc.addPage();
       y = 50;
@@ -1262,7 +1265,7 @@ async function gerarPdfTreino(treino) {
       });
     }
 
-    y += m.altura + (corBarra ? 2 : 8);
+    y += m.altura + espacoDepois;
   }
 
   // Faixa do bloco: pílula com o tipo + "3 séries · sem pausa entre os exercícios · descanso 60s"
@@ -1310,14 +1313,12 @@ async function gerarPdfTreino(treino) {
   }
 
   let numero = 0;
-  let zebra = 0;
   agruparEmBlocos(itensOrdenados).forEach((bloco) => {
     numero++;
 
     if (bloco.itens.length === 1) {
       const m = medirItem(bloco.itens[0], `${numero}`, true);
-      desenharItem(m, zebra % 2 === 0 ? [248, 248, 250] : null, null);
-      zebra++;
+      desenharItem(m, COR_NORMAL.tint, COR_NORMAL.cor, 8);
       return;
     }
 
@@ -1337,7 +1338,7 @@ async function gerarPdfTreino(treino) {
     }
 
     desenharCabecalhoBloco(cab);
-    medidas.forEach((m) => desenharItem(m, tipo.tint, tipo.cor));
+    medidas.forEach((m) => desenharItem(m, tipo.tint, tipo.cor, 2));
     y += 8;
   });
 
