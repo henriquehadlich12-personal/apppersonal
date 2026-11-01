@@ -1251,3 +1251,16 @@ html, body {
 .aluno-header-card { border-radius: 20px; }
 .section-header h1, .view h1 { letter-spacing: -0.02em; }
 .date-weekday { font-weight: 800; }
+
+/* v16.1 — correções de toque/desempenho e legenda */
+.date-nav::after { pointer-events: none; }
+.date-nav > * { position: relative; z-index: 1; }
+button, .icon-btn, .link-btn, .bottom-tab, .slot-row, .equip-card { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+.icon-btn { backdrop-filter: none; -webkit-backdrop-filter: none; min-width: 44px; min-height: 44px; }
+.icon-btn:active, .link-btn:active { transform: scale(0.94); opacity: 0.8; }
+.date-nav .link-btn, #btn-today { padding: 10px 14px; }
+.sheet-overlay { backdrop-filter: none; -webkit-backdrop-filter: none; }
+.slot-row { box-shadow: 0 1px 3px rgba(37,70,140,0.08); }
+.legend { flex-wrap: wrap; justify-content: center; gap: 6px 6px; padding: 0 4px; }
+.legend-item { flex: 0 0 auto; }
+.bottom-bar, .bottom-nav { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; background: rgba(255,255,255,0.97) !important; }
