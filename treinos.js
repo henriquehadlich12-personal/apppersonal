@@ -471,7 +471,7 @@ async function salvarNovoEquipamento(e) {
 
 // ------------------------------------------------------------
 // Modo Normal / Bi-set / Tri-set
-// Bi-set = 2 exercícios seguidos, sem descanso entre eles; tri-set = 3.
+// Bi-set = 2 exercícios feitos em sequência; tri-set = 3.
 // O descanso só vale no fim de cada rodada. Os exercícios do bloco são
 // escolhidos um por vez e só entram no treino quando o bloco fecha.
 // ------------------------------------------------------------
@@ -490,7 +490,7 @@ function selecionarModoSerie(modo, forcar) {
     ajuda.classList.add("is-hidden");
   } else {
     const n = blocoPendente.tamanho;
-    ajuda.textContent = `${n === 2 ? "Bi-set" : "Tri-set"}: ${n} exercícios feitos em sequência, sem descanso entre eles. O descanso vem só no fim de cada rodada.`;
+    ajuda.textContent = `${n === 2 ? "Bi-set" : "Tri-set"}: ${n} exercícios feitos em sequência. Defina as séries e o descanso do bloco no primeiro exercício.`;
     ajuda.classList.remove("is-hidden");
   }
   renderBannerBloco();
@@ -677,9 +677,8 @@ function renderTreinoDraftList() {
     const primeiro = bloco.itens[0];
     const resumo = [
       primeiro.series ? `${primeiro.series} séries` : null,
-      "sem pausa entre os exercícios",
       primeiro.descanso ? `descanso ${primeiro.descanso}` : null,
-    ].filter(Boolean).join(" · ");
+    ].filter(Boolean).join(" · ") || "exercícios em sequência";
 
     const card = document.createElement("div");
     card.className = `draft-bloco draft-bloco-${bloco.itens.length === 2 ? "bi" : bloco.itens.length === 3 ? "tri" : "x"}`;
@@ -989,7 +988,7 @@ function carregarImagemQuadrada(src, tamanho, comCrossOrigin) {
       ctx.drawImage(img, (tamanho - w) / 2, (tamanho - h) / 2, w, h);
       ctx.restore();
       ctx.lineWidth = 1.5;
-      ctx.strokeStyle = "#5B8CFF";
+      ctx.strokeStyle = "#2563EB";
       desenharFundoArredondado(ctx, 1, 1, tamanho - 2, tamanho - 2, tamanho * 0.16);
       ctx.stroke();
       resolve(canvas.toDataURL("image/png"));
@@ -1090,23 +1089,28 @@ async function gerarPdfTreino(treino) {
 
   // ---------- Cabeçalho ----------
   const alturaHeader = 96;
-  doc.setFillColor(18, 20, 26);
-  doc.rect(0, 0, larguraPagina, alturaHeader, "F");
-  doc.setFillColor(91, 140, 255);
-  doc.rect(0, alturaHeader - 3, larguraPagina, 3, "F");
+  // faixa em degradê azul -> turquesa (feito com fatias, o jsPDF não tem gradiente pronto)
+  const fatias = 60;
+  for (let i = 0; i < fatias; i++) {
+    const t = i / (fatias - 1);
+    doc.setFillColor(Math.round(37 + (6 - 37) * t), Math.round(99 + (182 - 99) * t), Math.round(235 + (212 - 235) * t));
+    doc.rect((larguraPagina / fatias) * i, 0, larguraPagina / fatias + 1, alturaHeader, "F");
+  }
 
   if (logoPng) {
-    doc.addImage(logoPng, "PNG", margem, 24, 40, 40);
+    doc.setFillColor(255, 255, 255);
+    doc.roundedRect(margem, 22, 52, 52, 13, 13, "F");
+    doc.addImage(logoPng, "PNG", margem + 8, 30, 36, 36);
   }
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("HENRIQUE HADLICH", margem + 52, 42);
+  doc.text("HENRIQUE HADLICH", margem + 66, 44);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.setTextColor(180, 186, 199);
+  doc.setTextColor(220, 240, 255);
   if (doc.setCharSpace) doc.setCharSpace(1.4);
-  doc.text("PERSONAL TRAINER", margem + 52, 56);
+  doc.text("PERSONAL TRAINER", margem + 66, 58);
   if (doc.setCharSpace) doc.setCharSpace(0);
 
   doc.setFont("helvetica", "bold");
@@ -1122,7 +1126,7 @@ async function gerarPdfTreino(treino) {
   doc.setFillColor(247, 247, 249);
   doc.roundedRect(margem, y, larguraPagina - margem * 2, alturaCardAluno, 10, 10, "FD");
 
-  doc.setFillColor(91, 140, 255);
+  doc.setFillColor(37, 99, 235);
   doc.circle(margem + 32, y + 37, 20, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
@@ -1146,9 +1150,9 @@ async function gerarPdfTreino(treino) {
   doc.setFontSize(9);
   pills.forEach((texto) => {
     const largura = doc.getTextWidth(texto) + 16;
-    doc.setFillColor(228, 235, 255);
+    doc.setFillColor(222, 234, 255);
     doc.roundedRect(pillX, pillY, largura, 18, 9, 9, "F");
-    doc.setTextColor(60, 90, 200);
+    doc.setTextColor(29, 78, 216);
     doc.text(texto, pillX + largura / 2, pillY + 12.5, { align: "center" });
     pillX += largura + 8;
   });
@@ -1156,7 +1160,7 @@ async function gerarPdfTreino(treino) {
   y += alturaCardAluno + 26;
 
   if (treino.titulo) {
-    doc.setDrawColor(91, 140, 255);
+    doc.setDrawColor(37, 99, 235);
     doc.setLineWidth(2.5);
     doc.line(margem, y, margem + 26, y);
     doc.setFont("helvetica", "bold");
@@ -1258,7 +1262,7 @@ async function gerarPdfTreino(treino) {
     if (m.linhasVideo.length) {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9.5);
-      doc.setTextColor(91, 140, 255);
+      doc.setTextColor(37, 99, 235);
       m.linhasVideo.forEach((linha) => {
         doc.textWithLink(linha, textoX, linhaY, { url: m.item.video_url });
         linhaY += 12;
@@ -1268,14 +1272,14 @@ async function gerarPdfTreino(treino) {
     y += m.altura + espacoDepois;
   }
 
-  // Faixa do bloco: pílula com o tipo + "3 séries · sem pausa entre os exercícios · descanso 60s"
+  // Faixa do bloco: pílula com o tipo + "3 séries · descanso de 60s ao final de cada rodada"
   function medirCabecalhoBloco(bloco, tipo) {
     const primeiro = bloco.itens[0];
     const partes = [
       primeiro.series ? `${primeiro.series} ${primeiro.series === 1 ? "série" : "séries"}` : null,
-      "sem pausa entre os exercícios",
       primeiro.descanso ? `descanso de ${primeiro.descanso} ao final de cada rodada` : null,
     ].filter(Boolean);
+    if (partes.length === 0) partes.push("exercícios feitos em sequência");
 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
