@@ -1,6 +1,33 @@
 // Seletor moderno de aluno: troca a lista nativa por botão + folha com busca.
 // O <select> original continua existindo (escondido), então a lógica do app não muda.
 (function () {
+  const STYLE_SELETOR = `
+.seletor-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 10px; background: #fff; border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--sombra); font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.seletor-btn:active { transform: scale(0.99); }
+.seletor-btn .aluno-avatar { width: 38px; height: 38px; flex: none; }
+.seletor-nome { flex: 1; font-weight: 700; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.seletor-ph { color: var(--text-muted); font-weight: 500; }
+.seletor-seta { color: #2563EB; font-size: 16px; }
+.seletor-vazio { background: linear-gradient(135deg, #2563EB, #06B6D4) !important; color: #fff !important; font-size: 20px; }
+#sheet-seletor { z-index: 70; }
+#sheet-seletor .sheet { max-height: 80vh; display: flex; flex-direction: column; }
+.seletor-busca { margin-bottom: 10px; }
+.seletor-lista { overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; -webkit-overflow-scrolling: touch; }
+.seletor-item { display: flex; align-items: center; gap: 12px; padding: 10px 12px; background: #fff; border: 1px solid var(--border); border-radius: 16px; font: inherit; color: var(--text); text-align: left; cursor: pointer; }
+.seletor-item .aluno-avatar { width: 38px; height: 38px; flex: none; }
+.seletor-item .seletor-check { visibility: hidden; color: #fff; background: linear-gradient(135deg, #2563EB, #06B6D4); width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 13px; }
+.seletor-item.is-sel { border-color: #2563EB; background: #EEF4FF; }
+.seletor-item.is-sel .seletor-check { visibility: visible; }
+
+.seletor-btn, .seletor-item { -webkit-appearance: none; appearance: none; box-sizing: border-box; margin: 0; }
+.seletor-btn { min-height: 56px; }
+.seletor-item { width: 100%; }
+.seletor-lista { flex: 1 1 auto; min-height: 0; }
+.seletor-busca { width: 100%; box-sizing: border-box; }
+.seletor-seta { font-size: 14px; }
+.seletor-item .seletor-nome { font-size: 16px; }
+`;
+  const st = document.createElement('style'); st.textContent = STYLE_SELETOR; document.head.appendChild(st);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const ini = (n) => (n || "?").trim().charAt(0).toUpperCase();
   let overlay;
