@@ -22,7 +22,20 @@ let currentDate = new Date();
 let alunosCache = [];
 let agendamentosDoDia = [];
 let tipoSelecionado = "personal";
+
+const NOME_TIPO = { personal: "Personal", avaliacao: "Avaliação", remarcacao: "Remarcação", bloqueio: "Bloqueio" };
+
+// Se o banco ainda não aceita "remarcacao" (patch13 não rodado), o Supabase devolve violação de check (23514).
+function faltaPatchRemarcacao(error) {
+  return tipoSelecionado === "remarcacao" && error && (error.code === "23514" || /agendamentos_tipo_check|chk_aluno_por_tipo/.test(error.message || ""));
+}
 let editandoId = null;
+// Mostra o motivo técnico no aviso (ajuda a achar patch faltando, internet, etc.)
+function detalheErro(error) {
+  if (!error) return "";
+  const t = error.code || (error.message || "").slice(0, 60);
+  return t ? " (" + t + ")" : "";
+}
 
 // ------------------------------------------------------------
 // Utilidades
@@ -54,6 +67,7 @@ function timeToMin(t) {
 const ICONS = {
   personal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6.5 6.5v11M17.5 6.5v11M2 9.5h3M2 14.5h3M19 9.5h3M19 14.5h3M6.5 12h11"/></svg>',
   avaliacao: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l2.5 2.5L16 8"/><rect x="4" y="4" width="16" height="17" rx="2.5"/></svg>',
+  remarcacao: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14-4.5L4 9"/><path d="M4 4v5h5"/><path d="M4 13a8 8 0 0 0 14 4.5L20 15"/><path d="M20 20v-5h-5"/></svg>',
   bloqueio: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M9 9l6 6M15 9l-6 6"/></svg>',
 };
 
@@ -178,7 +192,7 @@ function renderAgendaList() {
       const nome = agendamento.alunos ? agendamento.alunos.nome : "Aluno removido";
       info.innerHTML = `
         <div class="slot-titulo">${nome}</div>
-        <div class="slot-sub">até ${horaCurta(agendamento.hora_fim)}${agendamento.serie_id ? " · fixo" : ""}</div>`;
+        <div class="slot-sub">até ${horaCurta(agendamento.hora_fim)}${agendamento.serie_id ? " · fixo" : ""}${agendamento.tipo === "remarcacao" ? " · remarcado" : ""}</div>`;
       row.addEventListener("click", () => abrirSheetDetalhe(agendamento));
     }
     row.appendChild(info);
@@ -186,7 +200,7 @@ function renderAgendaList() {
     if (agendamento && agendamento.tipo !== "vago" && !ehContinuacao) {
       const badge = document.createElement("span");
       badge.className = "slot-badge";
-      badge.innerHTML = `${ICONS[agendamento.tipo]}<span>${agendamento.tipo === "personal" ? "Personal" : agendamento.tipo === "avaliacao" ? "Avaliação" : "Bloqueio"}</span>`;
+      badge.innerHTML = `${ICONS[agendamento.tipo]}<span>${NOME_TIPO[agendamento.tipo] || agendamento.tipo}</span>`;
       row.appendChild(badge);
     }
 
@@ -206,6 +220,8 @@ function selecionarTipo(tipo) {
   document.querySelectorAll(".tipo-opt").forEach((b) => b.classList.toggle("is-active", b.dataset.tipo === tipo));
   document.getElementById("campo-aluno").classList.toggle("is-hidden", tipo === "bloqueio");
   document.getElementById("campo-permanente").classList.toggle("is-hidden", tipo !== "personal");
+  document.getElementById("input-obs").placeholder =
+    tipo === "remarcacao" ? "Ex: remarcado de terça 07:00" : "Ex: trocar exercício de perna";
 }
 
 document.querySelectorAll(".tipo-opt").forEach((btn) => {
@@ -246,7 +262,7 @@ function abrirSheetNovo(horaStr) {
 function abrirSheetDetalhe(agendamento) {
   editandoId = agendamento.id;
   document.getElementById("sheet-horario-titulo").textContent =
-    agendamento.tipo === "bloqueio" ? "Bloqueio" : agendamento.tipo === "avaliacao" ? "Avaliação" : "Personal (fixo)";
+    (NOME_TIPO[agendamento.tipo] || "Horário") + (agendamento.tipo === "personal" && agendamento.serie_id ? " (fixo)" : "");
   formHorario.classList.add("is-hidden");
   const detalhe = document.getElementById("sheet-horario-detalhe");
   detalhe.classList.remove("is-hidden");
@@ -403,7 +419,7 @@ formHorario.addEventListener("submit", async (e) => {
     };
     const { error } = await sb.from("agendamentos").update(linha).eq("id", editandoId);
     if (error) {
-      toast("Erro ao salvar alterações");
+      toast(faltaPatchRemarcacao(error) ? "Falta rodar o patch13 no Supabase (Remarcação)" : "Erro ao salvar alterações" + detalheErro(error));
       console.error(error);
       return;
     }
@@ -431,7 +447,7 @@ formHorario.addEventListener("submit", async (e) => {
     }
     const { error } = await sb.from("agendamentos").insert(linhas);
     if (error) {
-      toast("Erro ao salvar horário permanente");
+      toast("Erro ao salvar horário permanente" + detalheErro(error));
       console.error(error);
       return;
     }
@@ -448,7 +464,7 @@ formHorario.addEventListener("submit", async (e) => {
     };
     const { error } = await sb.from("agendamentos").insert([linha]);
     if (error) {
-      toast("Erro ao salvar horário");
+      toast(faltaPatchRemarcacao(error) ? "Falta rodar o patch13 no Supabase (Remarcação)" : "Erro ao salvar horário" + detalheErro(error));
       console.error(error);
       return;
     }
